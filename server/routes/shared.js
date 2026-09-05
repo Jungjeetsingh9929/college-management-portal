@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { makeId, readDb, writeDb } from "../db/fileStore.js";
 import { requireAuth } from "../middleware/auth.js";
-import { rateLimit } from "../middleware/rateLimit.js";
+import { clientKey, rateLimit } from "../middleware/rateLimit.js";
 import { parseAnswerIndex, requiredText } from "../services/validation.js";
+import { getCollegeGeofence, isWithinCollege } from "../utils/geo.js";
 
 export const sharedRouter = Router();
 
@@ -64,7 +65,8 @@ sharedRouter.get("/student/assignments", requireAuth, async (req, res) => {
 const completeRateLimit = rateLimit({
   windowMs: 5 * 60 * 1000,
   limit: 20,
-  message: "Too many completion toggles. Please try again later."
+  message: "Too many completion toggles. Please try again later.",
+  keyGenerator: (req) => req.user?.id || clientKey(req)
 });
 
 // 2b. Student route: mark an assignment complete/incomplete (toggle via POST/DELETE)
@@ -144,6 +146,35 @@ sharedRouter.delete("/student/assignments/:id/complete", requireAuth, completeRa
   res.json({ completed: false });
 });
 
+// Student route: list active, unattempted quizzes for the student's class.
+// Polled by the client to power the in-app "new attendance question" notification.
+sharedRouter.get("/quiz/active", requireAuth, async (req, res) => {
+  if (req.user.role !== "student") return res.status(403).json({ message: "Student access required." });
+
+  const db = await readDb();
+  db.quizzes ||= [];
+  db.quizAttempts ||= [];
+
+  const student = db.students.find((s) => s.id === req.user.id);
+  if (!student) return res.status(404).json({ message: "Student not found." });
+
+  const subjects = db.subjects || [];
+  const active = db.quizzes
+    .filter((quiz) => quiz.active && quiz.className === student.className)
+    .filter((quiz) => !db.quizAttempts.some((attempt) => attempt.quizId === quiz.id && attempt.studentId === student.id))
+    .map((quiz) => {
+      const subject = subjects.find((s) => s.id === quiz.subjectId);
+      return {
+        id: quiz.id,
+        subjectName: subject ? subject.subjectName : "Unknown Subject",
+        createdAt: quiz.createdAt
+      };
+    })
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  res.json({ quizzes: active });
+});
+
 // Fetch a single quiz for answering (without exposing the correct answer index)
 sharedRouter.get("/quiz/:id", requireAuth, async (req, res) => {
   const db = await readDb();
@@ -179,10 +210,30 @@ sharedRouter.get("/quiz/:id", requireAuth, async (req, res) => {
 sharedRouter.post("/student/quiz/:id/answer", requireAuth, rateLimit({
   windowMs: 5 * 60 * 1000,
   limit: 10,
-  message: "Too many quiz submissions. Please try again later."
+  message: "Too many quiz submissions. Please try again later.",
+  keyGenerator: (req) => req.user?.id || clientKey(req)
 }), async (req, res) => {
   if (req.user.role !== "student") return res.status(403).json({ message: "Student access required." });
-  
+
+  // Campus-only gate: this endpoint marks attendance, so it must be verified
+  // that the device is physically on campus before anything else is checked
+  // (question correctness, existing attempts, etc). This mirrors the geofence
+  // check used by the direct /attendance/checkin flow.
+  const { latitude, longitude, accuracy } = req.body || {};
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return res.status(400).json({ message: "Location is required to answer an attendance question. Please allow location access and try again." });
+  }
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return res.status(400).json({ message: "Invalid coordinates." });
+  }
+
+  const geofence = getCollegeGeofence();
+  if (!geofence) {
+    return res.status(503).json({ message: "Location-based attendance isn't configured on this server yet." });
+  }
+
   const db = await readDb();
   db.quizzes ||= [];
   db.attendance ||= [];
@@ -196,6 +247,15 @@ sharedRouter.post("/student/quiz/:id/answer", requireAuth, rateLimit({
   if (!student) return res.status(404).json({ message: "Student not found." });
   if (quiz.className !== student.className) {
     return res.status(403).json({ message: "You are not in the class for this quiz." });
+  }
+
+  const { withinRange, distance, radiusMeters } = isWithinCollege(lat, lng, accuracy);
+  if (!withinRange) {
+    return res.status(403).json({
+      message: `You're about ${distance}m from campus. You need to be within ${radiusMeters}m of the college to answer an attendance question.`,
+      distance,
+      radiusMeters
+    });
   }
 
   const { answerIndex } = req.body;

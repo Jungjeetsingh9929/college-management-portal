@@ -1,18 +1,11 @@
 import { Router } from "express";
 import { makeId, readDb, writeDb } from "../db/fileStore.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireFaculty as requireTeacher } from "../middleware/auth.js";
 import { classesTaughtByTeacher, scheduleBelongsToTeacher } from "../services/accessService.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { parseAnswerIndex, requiredText } from "../services/validation.js";
 
 export const facultyRouter = Router();
-
-const requireTeacher = (req, res, next) => {
-  if (req.user.role !== "teacher") {
-    return res.status(403).json({ message: "Teacher access required." });
-  }
-  next();
-};
 
 // 1. Get schedule for logged-in teacher
 facultyRouter.get("/schedule", requireAuth, requireTeacher, async (req, res) => {
@@ -70,6 +63,10 @@ facultyRouter.post("/assignments", requireAuth, requireTeacher, async (req, res)
   if (Number.isNaN(new Date(dueDate).getTime())) {
     return res.status(400).json({ message: "dueDate must be a valid date." });
   }
+  const classesTaught = classesTaughtByTeacher(db, req.user.code);
+  if (!classesTaught.includes(className)) {
+    return res.status(403).json({ message: "You can only create assignments for classes you teach." });
+  }
   
   const assignment = {
     id: makeId("asg"),
@@ -107,6 +104,10 @@ facultyRouter.put("/assignments/:id", requireAuth, requireTeacher, async (req, r
   }
   if (Number.isNaN(new Date(dueDate).getTime())) {
     return res.status(400).json({ message: "dueDate must be a valid date." });
+  }
+  const classesTaught = classesTaughtByTeacher(db, req.user.code);
+  if (!classesTaught.includes(className)) {
+    return res.status(403).json({ message: "You can only assign this to classes you teach." });
   }
 
   assignment.title = safeTitle;
@@ -175,6 +176,18 @@ facultyRouter.post("/quizzes", requireAuth, requireTeacher, rateLimit({
   const safeCorrectAnswerIndex = parseAnswerIndex(correctAnswerIndex, options.length);
   if (safeCorrectAnswerIndex === null) {
     return res.status(400).json({ message: "correctAnswerIndex must point to a valid option." });
+  }
+
+  // A teacher must only be able to grant attendance for classes/subjects they
+  // actually teach - without this, any teacher account could create a quiz
+  // for someone else's class and mark those students present.
+  const classesTaught = classesTaughtByTeacher(db, req.user.code);
+  if (!classesTaught.includes(className)) {
+    return res.status(403).json({ message: "You can only create attendance questions for classes you teach." });
+  }
+  const subject = (db.subjects || []).find((item) => item.id === subjectId);
+  if (!subject || subject.className !== className) {
+    return res.status(400).json({ message: "Subject not found for the selected class." });
   }
   
   const quiz = {

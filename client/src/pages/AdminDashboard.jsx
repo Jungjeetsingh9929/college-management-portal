@@ -10,8 +10,6 @@ const blankStudent = {
   department: "Computer Science",
   email: "",
   password: "",
-  cardUid: "",
-  fingerprintId: "",
   phone: "",
   guardian: "",
   graduationYear: "2028"
@@ -23,8 +21,6 @@ const studentLabels = {
   className: "Class / Section",
   department: "Department",
   email: "Email",
-  cardUid: "Card UID from ESP32",
-  fingerprintId: "Fingerprint ID",
   graduationYear: "Graduation Year"
 };
 
@@ -59,7 +55,7 @@ export function AdminDashboard() {
 
   const filteredStudents = useMemo(() => {
     return students.filter((student) =>
-      [student.name, student.rollNumber, student.email, student.cardUid, student.fingerprintId]
+      [student.name, student.rollNumber, student.email]
         .join(" ")
         .toLowerCase()
         .includes(query.toLowerCase())
@@ -84,8 +80,6 @@ export function AdminDashboard() {
       department: student.department,
       email: student.email,
       password: "",
-      cardUid: student.cardUid || "",
-      fingerprintId: student.fingerprintId || "",
       phone: student.phone || "",
       guardian: student.guardian || "",
       graduationYear: student.graduationYear || "2028"
@@ -210,7 +204,7 @@ export function AdminDashboard() {
             </div>
           </div>
           <form className="admin-form" onSubmit={saveStudent}>
-            {["name", "rollNumber", "className", "department", "email", "graduationYear", "cardUid", "fingerprintId"].map((field) => (
+            {["name", "rollNumber", "className", "department", "email", "graduationYear"].map((field) => (
               <label key={field}>
                 {studentLabels[field]}
                 <input
@@ -234,7 +228,7 @@ export function AdminDashboard() {
           </form>
           <label className="search-field full-width">
             <Search size={17} />
-            <input placeholder="Search students, card UID, or fingerprint ID" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input placeholder="Search students" value={query} onChange={(e) => setQuery(e.target.value)} />
           </label>
           <div className="table-wrap compact-table">
             <table>
@@ -244,8 +238,6 @@ export function AdminDashboard() {
                   <th>Class</th>
                   <th>Attendance</th>
                   <th>Status</th>
-                  <th>Card UID</th>
-                  <th>Fingerprint</th>
                   <th></th>
                 </tr>
               </thead>
@@ -256,8 +248,6 @@ export function AdminDashboard() {
                     <td>{student.className}<span>{student.department}</span></td>
                     <td><Badge value={`${student.attendancePercentage}%`} /></td>
                     <td><Badge value={student.approvalStatus || "approved"} /></td>
-                    <td>{student.cardUid || "-"}</td>
-                    <td>{student.fingerprintId || "-"}</td>
                     <td>
                       <button className="icon-button" onClick={() => editStudent(student)} title="Edit student">
                         <Edit3 size={16} />

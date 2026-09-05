@@ -1,5 +1,5 @@
 import React from "react";
-import { Mail, Phone, ScanLine, UserRound } from "lucide-react";
+import { Mail, Phone, UserRound } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 
 export function StudentProfile() {
@@ -10,8 +10,7 @@ export function StudentProfile() {
     ["Department", user.department],
     ["Graduation year", user.graduationYear || "-"],
     ["Approval status", user.approvalStatus || "approved"],
-    ["Guardian", user.guardian || "-"],
-    ["Card UID", user.cardUid || "Not assigned"]
+    ["Guardian", user.guardian || "-"]
   ];
 
   return (
@@ -42,7 +41,6 @@ export function StudentProfile() {
           <h2>Contact</h2>
           <div className="contact-row"><Mail size={18} /> {user.email}</div>
           <div className="contact-row"><Phone size={18} /> {user.phone || "-"}</div>
-          <div className="contact-row"><ScanLine size={18} /> RFID/NFC enabled profile</div>
         </article>
       </section>
     </div>

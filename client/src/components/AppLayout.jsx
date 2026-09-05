@@ -2,6 +2,7 @@ import React from "react";
 import { BarChart3, BookOpen, CalendarDays, ClipboardList, GraduationCap, History, KeyRound, LayoutDashboard, LogOut, UserRound, UsersRound, Calendar, FileText, QrCode } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
+import { QuizNotifications } from "./QuizNotifications.jsx";
 
 export function AppLayout({ children }) {
   const { user, logout } = useAuth();
@@ -75,7 +76,10 @@ export function AppLayout({ children }) {
             <span className="eyebrow">{user?.role === "admin" ? "Admin panel" : user?.role === "teacher" ? "Faculty panel" : "Student panel"}</span>
             <h1>{user?.name}</h1>
           </div>
-          <div className="user-pill">{user?.role}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <QuizNotifications />
+            <div className="user-pill">{user?.role}</div>
+          </div>
         </header>
         {children}
       </main>

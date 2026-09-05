@@ -1,15 +1,8 @@
 import { Router } from "express";
 import { readDb } from "../db/fileStore.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAdmin, requireAuth } from "../middleware/auth.js";
 
 export const adminRouter = Router();
-
-const requireAdmin = (req, res, next) => {
-  if (req.user.role !== "admin") {
-    return res.status(403).json({ message: "Admin access required." });
-  }
-  next();
-};
 
 adminRouter.get("/assignments", requireAuth, requireAdmin, async (req, res) => {
   const db = await readDb();

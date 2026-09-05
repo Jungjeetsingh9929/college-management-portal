@@ -1,7 +1,32 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { MapPin } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { apiFetch } from "../context/api.js";
+
+// Asks the browser for the device's current GPS coordinates. Reused from the
+// same pattern as AttendanceCheckin so the campus check behaves identically
+// everywhere attendance can be marked.
+function getLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Your browser does not support location services."));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => resolve(position.coords),
+      (error) => {
+        const messages = {
+          1: "Location permission was denied. Allow location access to answer this attendance question.",
+          2: "Your location could not be determined. Try again with GPS/location turned on.",
+          3: "Getting your location timed out. Please try again."
+        };
+        reject(new Error(messages[error.code] || "Could not get your location."));
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  });
+}
 
 export function QuizAnswer() {
   const { id } = useParams();
@@ -16,6 +41,7 @@ export function QuizAnswer() {
   const [message, setMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [locating, setLocating] = useState(false);
 
   useEffect(() => {
     async function fetchQuiz() {
@@ -37,10 +63,20 @@ export function QuizAnswer() {
     if (selectedOption === null) return;
     
     setError("");
+    setLocating(true);
     try {
+      // This is what enforces "on campus only": the request is rejected
+      // server-side unless these coordinates fall inside the college geofence.
+      const coords = await getLocation();
+      setLocating(false);
       const data = await apiFetch(`/shared/student/quiz/${id}/answer`, {
         method: "POST",
-        body: JSON.stringify({ answerIndex: selectedOption })
+        body: JSON.stringify({
+          answerIndex: selectedOption,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          accuracy: coords.accuracy
+        })
       });
       
       setMessage(data.message);
@@ -51,6 +87,7 @@ export function QuizAnswer() {
         setIsSuccess(false);
       }
     } catch (err) {
+      setLocating(false);
       setError(err.message);
     }
   }
@@ -64,6 +101,9 @@ export function QuizAnswer() {
       <div className="card" style={{ maxWidth: '600px', margin: '0 auto' }}>
         <h2>Attendance Question</h2>
         <p>Answer correctly to be marked present for <strong>{quiz.subjectName}</strong>.</p>
+        <p style={{ display: "flex", alignItems: "center", gap: "6px", color: "#666", fontSize: "0.9rem" }}>
+          <MapPin size={16} /> You must be on campus &mdash; your device's location is checked when you submit.
+        </p>
         
         {message && (
           <div className={isSuccess ? "success-box" : "error-box"} style={{ margin: '1rem 0' }}>
@@ -90,8 +130,8 @@ export function QuizAnswer() {
               ))}
             </div>
             
-            <button type="submit" className="primary-button full" disabled={selectedOption === null}>
-              Submit Answer
+            <button type="submit" className="primary-button full" disabled={selectedOption === null || locating}>
+              {locating ? "Checking your location..." : "Submit Answer"}
             </button>
           </form>
         )}

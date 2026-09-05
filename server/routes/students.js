@@ -22,7 +22,7 @@ studentsRouter.get("/", requireAuth, async (req, res) => {
 
   if (q) {
     students = students.filter((student) =>
-      [student.name, student.rollNumber, student.email, student.cardUid, student.fingerprintId].some((value) =>
+      [student.name, student.rollNumber, student.email].some((value) =>
         String(value).toLowerCase().includes(q)
       )
     );
@@ -58,11 +58,6 @@ studentsRouter.post("/pending/:id/approve", requireAuth, requireAdmin, async (re
     department: request.department,
     email: request.email,
     password: request.password,
-    cardUid: request.cardUid || "",
-    fingerprintId: request.fingerprintId || "",
-    faceImageUrl: request.faceImageUrl || "",
-    faceDescriptor: Array.isArray(request.faceDescriptor) ? request.faceDescriptor : [],
-    faceEnrolled: Boolean(request.faceEnrolled),
     phone: request.phone || "",
     guardian: request.guardian || "",
     graduationYear: request.graduationYear || "2028",
@@ -103,11 +98,6 @@ studentsRouter.post("/", requireAuth, requireAdmin, async (req, res) => {
     department: req.body.department,
     email: req.body.email,
     password: bcrypt.hashSync(req.body.password, 10),
-    cardUid: req.body.cardUid || "",
-    fingerprintId: req.body.fingerprintId || "",
-    faceImageUrl: req.body.faceImageUrl || "",
-    faceDescriptor: Array.isArray(req.body.faceDescriptor) ? req.body.faceDescriptor : [],
-    faceEnrolled: Boolean(req.body.faceEnrolled || req.body.faceImageUrl || req.body.faceDescriptor?.length),
     phone: req.body.phone || "",
     guardian: req.body.guardian || "",
     graduationYear: req.body.graduationYear || "2028",
@@ -129,18 +119,12 @@ studentsRouter.put("/:id", requireAuth, requireAdmin, async (req, res) => {
     "className",
     "department",
     "email",
-    "cardUid",
-    "fingerprintId",
-    "faceImageUrl",
-    "faceEnrolled",
     "phone",
     "guardian",
     "graduationYear"
   ].forEach((field) => {
     if (req.body[field] !== undefined) student[field] = req.body[field];
   });
-  if (Array.isArray(req.body.faceDescriptor)) student.faceDescriptor = req.body.faceDescriptor;
-  if (req.body.faceImageUrl || req.body.faceDescriptor?.length) student.faceEnrolled = true;
   if (req.body.password) student.password = bcrypt.hashSync(req.body.password, 10);
 
   await writeDb(db);

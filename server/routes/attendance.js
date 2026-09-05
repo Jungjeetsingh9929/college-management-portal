@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { readDb, writeDb } from "../db/fileStore.js";
 import { requireAuth } from "../middleware/auth.js";
-import { rateLimit } from "../middleware/rateLimit.js";
+import { clientKey, rateLimit } from "../middleware/rateLimit.js";
 import {
   calculateStudentStats,
   enrichAttendance,
@@ -106,7 +106,8 @@ attendanceRouter.post(
   rateLimit({
     windowMs: 60_000,
     limit: 10,
-    message: "Too many attendance check-in attempts. Please wait a minute and try again."
+    message: "Too many attendance check-in attempts. Please wait a minute and try again.",
+    keyGenerator: (req) => req.user?.id || clientKey(req)
   }),
   async (req, res) => {
     if (req.user.role !== "student") {
