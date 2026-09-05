@@ -134,7 +134,7 @@ function AppRoutes() {
       <Route
         path="/teachers"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute roles={["teacher", "admin"]}>
             <AppLayout>
               <Teachers />
             </AppLayout>
@@ -211,6 +211,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

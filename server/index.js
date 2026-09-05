@@ -67,6 +67,10 @@ app.use("/api/faculty", facultyRouter);
 app.use("/api/shared", sharedRouter);
 app.use("/api/admin", adminRouter);
 
+app.use("/api", (_req, res) => {
+  res.status(404).json({ message: "API route not found." });
+});
+
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(distPath));
   app.get("*", (_req, res) => {
