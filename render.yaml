@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: college-management-portal
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CLIENT_ORIGIN
+        value: https://college-management-portal.onrender.com
+      - key: SEED_ADMIN_EMAIL
+        sync: false
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+      - key: SEED_STUDENT_PASSWORD
+        sync: false
+      - key: LOW_ATTENDANCE_THRESHOLD
+        value: 75
+      # Geofenced attendance (optional): leave unset to disable the
+      # "Mark my attendance" self check-in feature entirely.
+      - key: COLLEGE_LATITUDE
+        sync: false
+      - key: COLLEGE_LONGITUDE
+        sync: false
+      - key: COLLEGE_RADIUS_METERS
+        value: 200

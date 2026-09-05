@@ -1,0 +1,32 @@
+{
+  "name": "college-management-portal",
+  "version": "1.0.0",
+  "description": "Full-stack college management portal with role-based dashboards, attendance workflows, timetable management, complaints, and reports.",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "client": "vite --host 0.0.0.0 --port 5175",
+    "server": "node server/index.js",
+    "seed": "node server/scripts/seed.js",
+    "test": "node tests/api.test.js",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "bcryptjs": "^2.4.3",
+    "concurrently": "^9.1.2",
+    "cors": "^2.8.5",
+    "date-fns": "^4.1.0",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.468.0",
+    "pdfkit": "^0.15.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
+    "recharts": "^2.13.3",
+    "vite": "^6.0.3"
+  },
+  "devDependencies": {}
+}
