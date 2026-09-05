@@ -206,7 +206,8 @@ button {
 
 .scan-chip,
 .hero-card,
-.mini-grid div {
+.mini-grid div,
+.mini-grid-link {
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;
 }
@@ -244,9 +245,20 @@ button {
   grid-template-columns: repeat(2, 1fr);
 }
 
-.mini-grid div {
+.mini-grid div,
+.mini-grid-link {
   background: rgba(255, 255, 255, 0.08);
   padding: 16px;
+}
+
+.mini-grid-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.mini-grid-link:hover,
+.mini-grid-link:focus-visible {
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .feature-band {
