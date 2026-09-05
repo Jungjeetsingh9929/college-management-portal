@@ -10,8 +10,12 @@ export const authRouter = Router();
 
 authRouter.post("/login", rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 10,
-  message: "Too many login attempts. Please try again later."
+  limit: 20,
+  message: "Too many login attempts for this account. Please try again later.",
+  keyGenerator: (req) => {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    return `${req.ip || req.socket.remoteAddress || "unknown"}:${email || "unknown"}`;
+  }
 }), async (req, res) => {
   const { email, password, role } = req.body;
   if (!email || !password || !["admin", "teacher", "student"].includes(role)) {
