@@ -8,8 +8,10 @@ export function requiredText(value, field, { min = 1, max = 160 } = {}) {
 
 export function validPassword(value) {
   const password = String(value ?? "");
-  return password.length >= 8 && password.length <= 200;
+  return password.length >= 12 && password.length <= 200;
 }
+
+export const PASSWORD_REQUIREMENTS = "Password must be between 12 and 200 characters.";
 
 export function parseAnswerIndex(value, optionCount) {
   const index = Number(value);

@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { readDb } from "../db/fileStore.js";
 
 const secret = process.env.JWT_SECRET;
 
@@ -14,14 +15,15 @@ export function signToken(user) {
       name: user.name,
       email: user.email,
       code: user.code,
-      className: user.className
+      className: user.className,
+      passwordVersion: user.passwordVersion || 0
     },
     secret,
     { expiresIn: "8h" }
   );
 }
 
-export function requireAuth(req, res, next) {
+export async function requireAuth(req, res, next) {
   const header = req.headers.authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : null;
 
@@ -31,6 +33,16 @@ export function requireAuth(req, res, next) {
 
   try {
     req.user = jwt.verify(token, secret);
+    const db = await readDb();
+    const collection = req.user.role === "admin"
+      ? db.admins
+      : req.user.role === "teacher"
+      ? db.teachers || []
+      : db.students;
+    const account = (collection || []).find((item) => item.id === req.user.id);
+    if (!account || (account.passwordVersion || 0) !== (req.user.passwordVersion || 0)) {
+      return res.status(401).json({ message: "Your session has expired. Please sign in again." });
+    }
     next();
   } catch {
     res.status(401).json({ message: "Invalid or expired token." });

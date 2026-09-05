@@ -223,6 +223,32 @@ try {
     "the POST /teachers response should not echo the password hash back"
   );
 
+  const weakPassword = await request("/auth/change-password", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${student.token}` },
+    body: JSON.stringify({ currentPassword: process.env.SEED_STUDENT_PASSWORD, newPassword: "too-short" })
+  });
+  assert.equal(weakPassword.response.status, 400);
+
+  const changedPassword = "student-rotated-password-2026";
+  const passwordChange = await json("/auth/change-password", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${student.token}` },
+    body: JSON.stringify({ currentPassword: process.env.SEED_STUDENT_PASSWORD, newPassword: changedPassword })
+  });
+  assert.equal(passwordChange.success, true);
+
+  const expiredSession = await request("/auth/me", {
+    headers: { Authorization: `Bearer ${student.token}` }
+  });
+  assert.equal(expiredSession.response.status, 401);
+
+  const rotatedLogin = await json("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email: "student001@example.edu", password: changedPassword, role: "student" })
+  });
+  assert.equal(rotatedLogin.user.role, "student");
+
   console.log("API security smoke tests passed.");
 } finally {
   server.close();

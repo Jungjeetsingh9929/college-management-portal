@@ -3,6 +3,7 @@ import { Router } from "express";
 import { makeId, readDb, writeDb } from "../db/fileStore.js";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
 import { publicStudent } from "../services/attendanceService.js";
+import { PASSWORD_REQUIREMENTS, validPassword } from "../services/validation.js";
 
 export const studentsRouter = Router();
 
@@ -87,8 +88,8 @@ studentsRouter.post("/pending/:id/reject", requireAuth, requireAdmin, async (req
 
 studentsRouter.post("/", requireAuth, requireAdmin, async (req, res) => {
   const db = await readDb();
-  if (!req.body.password) {
-    return res.status(400).json({ message: "Password is required when creating a student." });
+  if (!validPassword(req.body.password)) {
+    return res.status(400).json({ message: `A ${PASSWORD_REQUIREMENTS.toLowerCase()} is required when creating a student.` });
   }
   const student = {
     id: makeId("stu"),
@@ -97,7 +98,8 @@ studentsRouter.post("/", requireAuth, requireAdmin, async (req, res) => {
     className: req.body.className,
     department: req.body.department,
     email: req.body.email,
-    password: bcrypt.hashSync(req.body.password, 10),
+    password: bcrypt.hashSync(req.body.password, 12),
+    passwordVersion: 0,
     phone: req.body.phone || "",
     guardian: req.body.guardian || "",
     graduationYear: req.body.graduationYear || "2028",
@@ -125,7 +127,11 @@ studentsRouter.put("/:id", requireAuth, requireAdmin, async (req, res) => {
   ].forEach((field) => {
     if (req.body[field] !== undefined) student[field] = req.body[field];
   });
-  if (req.body.password) student.password = bcrypt.hashSync(req.body.password, 10);
+  if (req.body.password !== undefined) {
+    if (!validPassword(req.body.password)) return res.status(400).json({ message: PASSWORD_REQUIREMENTS });
+    student.password = bcrypt.hashSync(req.body.password, 12);
+    student.passwordVersion = (student.passwordVersion || 0) + 1;
+  }
 
   await writeDb(db);
   res.json({ student: publicStudent(student, db.attendance) });

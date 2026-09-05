@@ -19,8 +19,8 @@ const demoStudentPassword = seedSecret("SEED_STUDENT_PASSWORD", "change-this-stu
 // Each teacher gets its own predictable demo password ("<CODE>@Uem2026"),
 // or a real one via FACULTY_<CODE>_EMAIL/FACULTY_<CODE>_PASSWORD — see the
 // teacher-account generation below.
-const passwordHash = bcrypt.hashSync(demoStudentPassword, 10);
-const adminHash = bcrypt.hashSync(demoAdminPassword, 10);
+const passwordHash = bcrypt.hashSync(demoStudentPassword, 12);
+const adminHash = bcrypt.hashSync(demoAdminPassword, 12);
 
 export const seedData = {
   admins: [
@@ -712,7 +712,7 @@ seedData.teachers = teacherCodes.map((code) => {
   // no real security since the value itself is public, and doing this for
   // every one of the ~110+ teacher accounts on every server start was
   // previously blocking the event loop for several seconds at startup.
-  const hashCost = overridePassword ? 10 : 4;
+  const hashCost = overridePassword ? 12 : 4;
   return {
     id: `tch-${code.toLowerCase()}`,
     code,
@@ -720,6 +720,7 @@ seedData.teachers = teacherCodes.map((code) => {
     department,
     email: overrideEmail || `${code.toLowerCase()}@example.edu`,
     password: bcrypt.hashSync(overridePassword || defaultPassword, hashCost),
+    passwordVersion: 0,
     role: "teacher",
     phone: "",
     cabin: `Faculty Block ${code}`,

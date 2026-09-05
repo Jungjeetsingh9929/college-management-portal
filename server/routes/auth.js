@@ -4,7 +4,7 @@ import { makeId, readDb, writeDb } from "../db/fileStore.js";
 import { requireAuth, signToken } from "../middleware/auth.js";
 import { publicStudent } from "../services/attendanceService.js";
 import { rateLimit } from "../middleware/rateLimit.js";
-import { validPassword } from "../services/validation.js";
+import { PASSWORD_REQUIREMENTS, validPassword } from "../services/validation.js";
 
 export const authRouter = Router();
 
@@ -51,7 +51,7 @@ authRouter.post("/student-request", async (req, res) => {
   const rollNumber = String(req.body.rollNumber || "").trim();
 
   if (!req.body.name || !rollNumber || !email || !validPassword(req.body.password)) {
-    return res.status(400).json({ message: "Name, roll number, email, and a password of at least 8 characters are required." });
+    return res.status(400).json({ message: `Name, roll number, email, and a ${PASSWORD_REQUIREMENTS.toLowerCase()} are required.` });
   }
 
   const emailExists = db.students.some((student) => student.email.toLowerCase() === email);
@@ -67,7 +67,7 @@ authRouter.post("/student-request", async (req, res) => {
     className: req.body.className || "CSE 3A",
     department: req.body.department || "Computer Science",
     email,
-    password: bcrypt.hashSync(req.body.password, 10),
+    password: bcrypt.hashSync(req.body.password, 12),
     phone: req.body.phone || "",
     guardian: req.body.guardian || "",
     graduationYear: req.body.graduationYear || "2028",
@@ -94,7 +94,7 @@ authRouter.post("/change-password", requireAuth, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
   if (!currentPassword || !validPassword(newPassword)) {
     return res.status(400).json({
-      message: "Current password and a new password of at least 8 characters are required."
+      message: `Current password and a new ${PASSWORD_REQUIREMENTS.toLowerCase()} are required.`
     });
   }
 
@@ -117,10 +117,11 @@ authRouter.post("/change-password", requireAuth, async (req, res) => {
     return res.status(400).json({ message: "New password must be different from the current password." });
   }
 
-  account.password = bcrypt.hashSync(String(newPassword), 10);
+  account.password = bcrypt.hashSync(String(newPassword), 12);
+  account.passwordVersion = (account.passwordVersion || 0) + 1;
   await writeDb(db);
 
-  res.json({ success: true, message: "Password updated successfully." });
+  res.json({ success: true, message: "Password updated. Please sign in again on this device." });
 });
 
 authRouter.get("/me", requireAuth, async (req, res) => {

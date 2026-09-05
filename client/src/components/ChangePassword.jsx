@@ -14,8 +14,8 @@ export function ChangePassword() {
     setError("");
     setMessage("");
 
-    if (newPassword.length < 8) {
-      setError("New password must be at least 8 characters.");
+    if (newPassword.length < 12) {
+      setError("New password must be between 12 and 200 characters.");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -29,7 +29,7 @@ export function ChangePassword() {
         method: "POST",
         body: JSON.stringify({ currentPassword, newPassword })
       });
-      setMessage(data.message || "Password updated successfully.");
+      setMessage(data.message || "Password updated. Please sign in again.");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -43,7 +43,7 @@ export function ChangePassword() {
   return (
     <article className="panel">
       <h2>Change password</h2>
-      <p>Update the password you use to sign in. You will need your current password to confirm the change.</p>
+      <p>Use at least 12 characters. Your current password is required, and all existing sessions will be signed out after the change.</p>
       <form onSubmit={handleSubmit} className="form-stack" autoComplete="off">
         <label>
           Current password
@@ -62,7 +62,7 @@ export function ChangePassword() {
             value={newPassword}
             onChange={(event) => setNewPassword(event.target.value)}
             autoComplete="new-password"
-            minLength={8}
+            minLength={12}
             required
           />
         </label>
@@ -73,7 +73,7 @@ export function ChangePassword() {
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}
             autoComplete="new-password"
-            minLength={8}
+            minLength={12}
             required
           />
         </label>
