@@ -5,6 +5,7 @@ services:
     plan: free
     buildCommand: npm install && npm run build
     startCommand: npm start
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
@@ -20,6 +21,10 @@ services:
         sync: false
       - key: SEED_STUDENT_PASSWORD
         sync: false
+      # Staging/portfolio mode only. Replace every FACULTY_<CODE>_PASSWORD
+      # with a unique secret before real college use, then remove this flag.
+      - key: ALLOW_DEMO_TEACHER_PASSWORDS
+        value: true
       - key: LOW_ATTENDANCE_THRESHOLD
         value: 75
       # Geofenced attendance (optional): leave unset to disable the

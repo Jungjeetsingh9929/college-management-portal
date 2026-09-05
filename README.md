@@ -11,7 +11,8 @@ The project focuses on common college operations such as role-based access, stud
 - Role-based authentication structure
 - Student request and approval flow
 - Attendance management with duplicate-entry protection
-- Geofenced student self check-in — the app is usable from anywhere, but a student can only mark themselves present when their device's GPS shows they're physically on campus
+- Staff-marked attendance — a teacher (for their own classes) or an admin (for any class) marks each student present or absent from a roster
+- Geofenced quiz-based attendance — a teacher posts a short quiz question, and a student who answers correctly (from a device physically on campus) is automatically marked present, no staff action needed
 - Timetable, subject, teacher, and complaint modules
 - CSV/PDF report generation
 - Mobile-friendly frontend layout
@@ -59,23 +60,28 @@ its own predictable demo login of the form `<code>@example.edu` /
 faculty member a real login instead, set `FACULTY_<CODE>_EMAIL` and
 `FACULTY_<CODE>_PASSWORD` in `.env`.
 
-### Geofenced attendance
+### Geofenced quiz attendance
 
 Set `COLLEGE_LATITUDE`, `COLLEGE_LONGITUDE`, and `COLLEGE_RADIUS_METERS` in
-`.env` to your campus's coordinates. Once set, logged-in students see a
-"Mark my attendance" card on their dashboard: tapping it asks the browser
-for the device's GPS location, and the server only accepts the check-in if
-that location is within `COLLEGE_RADIUS_METERS` of the college. Everything
-else in the app (viewing schedules, assignments, quizzes, reports, etc.)
-works from anywhere in the country — only the attendance check-in itself is
-location-restricted. If these variables are left unset, the check-in card
-is hidden and the feature is effectively disabled.
+`.env` to your campus's coordinates. Once set, a student answering a
+teacher's attendance quiz is only marked present if their browser's GPS
+location is within `COLLEGE_RADIUS_METERS` of the college; the server
+rejects the answer otherwise. Everything else in the app (viewing
+schedules, assignments, quizzes, reports, etc.) works from anywhere in the
+country — only the quiz-answer submission is location-restricted. If these
+variables are left unset, the quiz-answer endpoint responds with a 503
+instead of marking attendance.
+
+Students can no longer mark themselves present directly. Attendance is
+recorded in exactly two ways: a teacher or admin marking a student by hand
+from the "Mark Attendance" roster, or a student answering a quiz question
+correctly while on campus.
 
 Notes:
 - Geolocation requires HTTPS in production browsers (or `localhost` while
   developing) — a plain `http://` deployment will not be able to prompt for
   location.
-- This is a reasonable deterrent against a student marking attendance from
+- This is a reasonable deterrent against a student answering a quiz from
   home, not a forgery-proof system — a browser extension or a rooted/jailbroken
   phone can still fake GPS coordinates. Treat it as one signal, not a
   guarantee, if you extend this into a real production attendance system.

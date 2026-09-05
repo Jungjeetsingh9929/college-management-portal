@@ -44,6 +44,60 @@ button {
   color: var(--muted);
 }
 
+.pwa-install-prompt {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  bottom: 20px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.18);
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 16px 18px;
+  position: fixed;
+  right: 20px;
+  z-index: 20;
+}
+
+.pwa-install-prompt strong,
+.pwa-install-prompt span {
+  display: block;
+}
+
+.pwa-install-prompt strong {
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.pwa-install-prompt span {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.pwa-install-actions {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .pwa-install-prompt {
+    align-items: stretch;
+    bottom: 12px;
+    flex-direction: column;
+    gap: 12px;
+    left: 12px;
+    right: 12px;
+  }
+
+  .pwa-install-actions {
+    justify-content: flex-end;
+  }
+}
+
 .brand {
   display: flex;
   align-items: center;

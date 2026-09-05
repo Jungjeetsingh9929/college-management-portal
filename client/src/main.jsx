@@ -18,16 +18,21 @@ import { SubjectManagement } from "./pages/SubjectManagement.jsx";
 import { Teachers } from "./pages/Teachers.jsx";
 import { FacultyDashboard } from "./pages/FacultyDashboard.jsx";
 import { FacultyAssignments } from "./pages/FacultyAssignments.jsx";
+import { MarkAttendance } from "./pages/MarkAttendance.jsx";
 import { QuizGenerator } from "./pages/QuizGenerator.jsx";
 import { QuizAnswer } from "./pages/QuizAnswer.jsx";
 import { YearSchedule } from "./pages/YearSchedule.jsx";
+import { PwaInstallPrompt } from "./components/PwaInstallPrompt.jsx";
 import "./styles.css";
 
-function ProtectedRoute({ children, role }) {
+function ProtectedRoute({ children, role, roles }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="screen-loader">Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
-  if (role && user.role !== role) return <Navigate to={user.role === "admin" ? "/admin" : user.role === "teacher" ? "/faculty" : "/student"} replace />;
+  const allowedRoles = roles || (role ? [role] : null);
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return <Navigate to={user.role === "admin" ? "/admin" : user.role === "teacher" ? "/faculty" : "/student"} replace />;
+  }
   return children;
 }
 
@@ -157,6 +162,16 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/mark-attendance"
+        element={
+          <ProtectedRoute roles={["teacher", "admin"]}>
+            <AppLayout>
+              <MarkAttendance />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/faculty/assignments"
         element={
           <ProtectedRoute role="teacher">
@@ -200,11 +215,20 @@ function AppRoutes() {
   );
 }
 
+if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch((error) => {
+      console.error("PWA service worker registration failed", error);
+    });
+  });
+}
+
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <AuthProvider>
       <BrowserRouter>
         <AppRoutes />
+        <PwaInstallPrompt />
       </BrowserRouter>
     </AuthProvider>
   </React.StrictMode>

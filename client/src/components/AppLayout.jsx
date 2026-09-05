@@ -1,5 +1,5 @@
 import React from "react";
-import { BarChart3, BookOpen, CalendarDays, ClipboardList, GraduationCap, History, KeyRound, LayoutDashboard, LogOut, UserRound, UsersRound, Calendar, FileText, QrCode } from "lucide-react";
+import { BarChart3, BookOpen, CalendarDays, ClipboardCheck, ClipboardList, GraduationCap, History, KeyRound, LayoutDashboard, LogOut, UserRound, UsersRound, Calendar, FileText, QrCode } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { QuizNotifications } from "./QuizNotifications.jsx";
@@ -10,6 +10,7 @@ export function AppLayout({ children }) {
   const adminLinks = [
     { to: "/admin", label: "Dashboard", icon: LayoutDashboard },
     { to: "/subjects", label: "Subjects", icon: BookOpen },
+    { to: "/mark-attendance", label: "Mark Attendance", icon: ClipboardCheck },
     { to: "/schedule", label: "Schedule", icon: CalendarDays },
     { to: "/teachers", label: "Teachers", icon: UsersRound },
     { to: "/complaints", label: "Complaints", icon: ClipboardList },
@@ -21,6 +22,7 @@ export function AppLayout({ children }) {
   const facultyLinks = [
     { to: "/faculty", label: "Dashboard", icon: LayoutDashboard },
     { to: "/faculty/assignments", label: "Assignments", icon: FileText },
+    { to: "/mark-attendance", label: "Mark Attendance", icon: ClipboardCheck },
     { to: "/faculty/quiz-generate", label: "QR Attendance", icon: QrCode },
     { to: "/schedule", label: "Class Schedule", icon: CalendarDays },
     { to: "/year-schedule", label: "Year Schedule", icon: Calendar },

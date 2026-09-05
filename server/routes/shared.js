@@ -217,8 +217,7 @@ sharedRouter.post("/student/quiz/:id/answer", requireAuth, rateLimit({
 
   // Campus-only gate: this endpoint marks attendance, so it must be verified
   // that the device is physically on campus before anything else is checked
-  // (question correctness, existing attempts, etc). This mirrors the geofence
-  // check used by the direct /attendance/checkin flow.
+  // (question correctness, existing attempts, etc).
   const { latitude, longitude, accuracy } = req.body || {};
   const lat = Number(latitude);
   const lng = Number(longitude);

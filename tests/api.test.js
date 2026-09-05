@@ -3,6 +3,9 @@ process.env.JWT_SECRET = "test-attendance-secret-32-chars-long";
 process.env.SEED_ADMIN_EMAIL = "admin@example.edu";
 process.env.SEED_ADMIN_PASSWORD = "test-admin-password";
 process.env.SEED_STUDENT_PASSWORD = "test-student-password";
+process.env.COLLEGE_LATITUDE = "27.2124649";
+process.env.COLLEGE_LONGITUDE = "75.7002425";
+process.env.COLLEGE_RADIUS_METERS = "300";
 
 import assert from "node:assert/strict";
 
@@ -129,7 +132,7 @@ try {
   const firstAttempt = await request(`/shared/student/quiz/${quiz.quiz.id}/answer`, {
     method: "POST",
     headers: { Authorization: `Bearer ${student.token}` },
-    body: JSON.stringify({ answerIndex: 0 })
+    body: JSON.stringify({ answerIndex: 0, latitude: 27.2124649, longitude: 75.7002425, accuracy: 10 })
   });
   assert.equal(firstAttempt.response.status, 200);
   assert.equal(firstAttempt.data.correct, false);
@@ -137,7 +140,7 @@ try {
   const secondAttempt = await request(`/shared/student/quiz/${quiz.quiz.id}/answer`, {
     method: "POST",
     headers: { Authorization: `Bearer ${student.token}` },
-    body: JSON.stringify({ answerIndex: 1 })
+    body: JSON.stringify({ answerIndex: 1, latitude: 27.2124649, longitude: 75.7002425, accuracy: 10 })
   });
   assert.equal(secondAttempt.response.status, 409);
 
@@ -175,7 +178,8 @@ try {
   assert.equal(a3Days.status, "due-soon");
   assert.equal(a4Days.status, "upcoming");
 
-  const otherClass = "BBA 1";
+  const otherClass = teacherStudents.students.find((item) => item.className !== quizClass)?.className;
+  assert.ok(otherClass, "seed data should contain another class taught by the teacher");
   const assignmentOtherClass = await json("/faculty/assignments", {
     method: "POST",
     headers: { Authorization: `Bearer ${teacher.token}` },

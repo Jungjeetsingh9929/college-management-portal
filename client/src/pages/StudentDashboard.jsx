@@ -3,7 +3,6 @@ import { AlertTriangle, Calendar, CalendarCheck, CheckCircle2, Save, XCircle } f
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Link, useNavigate } from "react-router-dom";
 import { Badge, EmptyState, ProgressBar, StatCard } from "../components/UI.jsx";
-import { AttendanceCheckin } from "../components/AttendanceCheckin.jsx";
 import { apiFetch } from "../context/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { sortAssignmentsByUrgency } from "../utils/assignments.js";
@@ -70,7 +69,6 @@ export function StudentDashboard() {
           </div>
         </div>
       )}
-      <AttendanceCheckin onMarked={loadData} />
       <section className="stats-grid">
         <StatCard label="Overall percentage" value={`${summary.stats.percentage}%`} hint="All subjects" tone="blue" />
         <StatCard label="Present" value={summary.stats.present} hint="Marked present" tone="green" />

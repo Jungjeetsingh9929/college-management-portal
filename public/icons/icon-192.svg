@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="College Portal">
+  <rect width="192" height="192" rx="42" fill="#2563eb"/>
+  <path d="M32 78 96 42l64 36-64 36-64-36Z" fill="#fff"/>
+  <path d="M54 91v28c19 16 65 16 84 0V91L96 115 54 91Z" fill="#dbeafe"/>
+  <path d="M158 80v40" stroke="#fff" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="158" cy="129" r="7" fill="#fff"/>
+</svg>
