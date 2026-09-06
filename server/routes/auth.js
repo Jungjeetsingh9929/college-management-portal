@@ -3,22 +3,32 @@ import { Router } from "express";
 import { makeId, readDb, writeDb } from "../db/fileStore.js";
 import { requireAuth, signToken } from "../middleware/auth.js";
 import { publicStudent } from "../services/attendanceService.js";
-import { rateLimit } from "../middleware/rateLimit.js";
-import { PASSWORD_REQUIREMENTS, validPassword } from "../services/validation.js";
+import { rateConfig, rateLimit } from "../middleware/rateLimit.js";
+import { PASSWORD_REQUIREMENTS, requiredText, validEmail, validPassword, validateKeys } from "../services/validation.js";
 
 export const authRouter = Router();
+const loginIpConfig = rateConfig("AUTH_LOGIN_IP", { windowMs: 15 * 60 * 1000, limit: 20, backoffBaseMs: 1000, backoffMaxMs: 60 * 1000 });
+const loginAccountConfig = rateConfig("AUTH_LOGIN_ACCOUNT", { windowMs: 15 * 60 * 1000, limit: 8, backoffBaseMs: 2000, backoffMaxMs: 5 * 60 * 1000 });
+const signupConfig = rateConfig("AUTH_SIGNUP", { windowMs: 60 * 60 * 1000, limit: 10, backoffBaseMs: 2000, backoffMaxMs: 10 * 60 * 1000 });
 
 authRouter.post("/login", rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 20,
+  ...loginIpConfig,
   message: "Too many login attempts for this account. Please try again later.",
   keyGenerator: (req) => {
     const email = String(req.body?.email || "").trim().toLowerCase();
     return `${req.ip || req.socket.remoteAddress || "unknown"}:${email || "unknown"}`;
   }
+}), rateLimit({
+  ...loginAccountConfig,
+  keyGenerator: (req) => String(req.body?.email || "unknown").trim().toLowerCase(),
+  message: "Too many login attempts for this account. Please try again later."
 }), async (req, res) => {
+  if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+    return res.status(400).json({ message: "Invalid login request." });
+  }
+  try { validateKeys(req.body, ["email", "password", "role"]); } catch { return res.status(400).json({ message: "Invalid login request." }); }
   const { email, password, role } = req.body;
-  if (!email || !password || !["admin", "teacher", "student"].includes(role)) {
+  if (!validEmail(email) || !validPassword(password) || !["admin", "teacher", "student"].includes(role)) {
     return res.status(401).json({ message: "Invalid email, password, or role." });
   }
   const db = await readDb();
@@ -48,14 +58,25 @@ authRouter.post("/login", rateLimit({
   res.json({ token, user: safeUser });
 });
 
-authRouter.post("/student-request", async (req, res) => {
+authRouter.post("/student-request", rateLimit({
+  ...signupConfig,
+  message: "Too many registration requests. Please try again later."
+}), async (req, res) => {
+  if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) return res.status(400).json({ message: "Invalid registration request." });
+  try { validateKeys(req.body, ["name", "rollNumber", "email", "password", "className", "department", "phone", "guardian", "graduationYear"]); } catch { return res.status(400).json({ message: "Invalid registration request." }); }
   const db = await readDb();
   db.pendingStudents ||= [];
   const email = String(req.body.email || "").trim().toLowerCase();
   const rollNumber = String(req.body.rollNumber || "").trim();
 
-  if (!req.body.name || !rollNumber || !email || !validPassword(req.body.password)) {
+  if (!validEmail(email) || !validPassword(req.body.password)) {
     return res.status(400).json({ message: `Name, roll number, email, and a ${PASSWORD_REQUIREMENTS.toLowerCase()} are required.` });
+  }
+  let name;
+  try { name = requiredText(req.body.name, "Name", { max: 120 }); } catch { return res.status(400).json({ message: "Name is invalid." }); }
+  if (!rollNumber || rollNumber.length > 40) return res.status(400).json({ message: "Roll number is invalid." });
+  for (const [field, max] of [["className", 80], ["department", 100], ["phone", 30], ["guardian", 120], ["graduationYear", 10]]) {
+    if (req.body[field] !== undefined) { try { requiredText(req.body[field], field, { min: 0, max }); } catch { return res.status(400).json({ message: "Invalid registration request." }); } }
   }
 
   const emailExists = db.students.some((student) => student.email.toLowerCase() === email);
@@ -66,7 +87,7 @@ authRouter.post("/student-request", async (req, res) => {
 
   const request = {
     id: makeId("req"),
-    name: req.body.name,
+    name,
     rollNumber,
     className: req.body.className || "CSE 3A",
     department: req.body.department || "Computer Science",
@@ -95,8 +116,9 @@ authRouter.post("/student-request", async (req, res) => {
 });
 
 authRouter.post("/change-password", requireAuth, async (req, res) => {
+  try { validateKeys(req.body || {}, ["currentPassword", "newPassword"]); } catch { return res.status(400).json({ message: "Invalid password change request." }); }
   const { currentPassword, newPassword } = req.body;
-  if (!currentPassword || !validPassword(newPassword)) {
+  if (!validPassword(currentPassword) || !validPassword(newPassword)) {
     return res.status(400).json({
       message: `Current password and a new ${PASSWORD_REQUIREMENTS.toLowerCase()} are required.`
     });

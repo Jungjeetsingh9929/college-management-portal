@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { readDb, writeDb } from "../db/fileStore.js";
 import { requireAuth, requireStaff } from "../middleware/auth.js";
-import { clientKey, rateLimit } from "../middleware/rateLimit.js";
+import { clientKey, rateConfig, rateLimit } from "../middleware/rateLimit.js";
 import {
   calculateStudentStats,
   enrichAttendance,
@@ -132,8 +132,7 @@ attendanceRouter.post(
   requireAuth,
   requireStaff,
   rateLimit({
-    windowMs: 60_000,
-    limit: 60,
+    ...rateConfig("ATTENDANCE_MARK", { windowMs: 60_000, limit: 60 }),
     message: "Too many attendance updates. Please wait a minute and try again.",
     keyGenerator: (req) => req.user?.id || clientKey(req)
   }),

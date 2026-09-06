@@ -18,15 +18,14 @@
     "concurrently": "^9.1.2",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
-    "express": "^4.21.2",
+    "express": "^5.2.1",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.468.0",
     "pdfkit": "^0.15.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.28.0",
+    "react-router-dom": "^7.18.3",
     "recharts": "^2.13.3",
     "vite": "^6.0.3"
-  },
-  "devDependencies": {}
+  }
 }

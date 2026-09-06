@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
 import { teacherLegend, departmentNames } from "./teacherLegend.js";
 import { part2aSchedule } from "./schedule_part2a.js";
 import { part2bSchedule } from "./schedule_part2b.js";
@@ -10,11 +11,13 @@ function seedSecret(name, fallback) {
   if (process.env.NODE_ENV === "production" && !value) {
     throw new Error(`${name} must be set in production.`);
   }
-  return value || fallback;
+  return value || fallback || randomBytes(32).toString("hex");
 }
 
-const demoAdminPassword = seedSecret("SEED_ADMIN_PASSWORD", "change-this-admin-password");
-const demoStudentPassword = seedSecret("SEED_STUDENT_PASSWORD", "change-this-student-password");
+const demoAdminPassword = seedSecret("SEED_ADMIN_PASSWORD", "");
+const demoStudentPassword = seedSecret("SEED_STUDENT_PASSWORD", "");
+const e2eFacultyPassword = seedSecret("E2E_FACULTY_PASSWORD", "");
+const e2eAdminPassword = seedSecret("E2E_ADMIN_PASSWORD", "");
 // Note: teacher accounts do NOT use a single shared SEED_TEACHER_PASSWORD.
 // Each teacher gets its own predictable demo password ("<CODE>@Uem2026"),
 // or a real one via FACULTY_<CODE>_EMAIL/FACULTY_<CODE>_PASSWORD — see the
@@ -672,10 +675,8 @@ const teacherCodes = [
   ])
 ].sort();
 
-// Individual faculty accounts can be given a real login instead of the
-// per-teacher demo password by setting FACULTY_<CODE>_EMAIL /
-// FACULTY_<CODE>_PASSWORD. Anyone not overridden gets a unique, predictable
-// demo password of the form "<CODE>@Uem2026" (see credentials PDF).
+// Individual faculty accounts must receive credentials through
+// FACULTY_<CODE>_EMAIL / FACULTY_<CODE>_PASSWORD.
 seedData.teachers = teacherCodes.map((code) => {
   const [name, deptCode] = teacherProfiles[code] || [`Professor ${code}`, "General"];
   const department = departmentNames[deptCode] || deptCode;
@@ -688,14 +689,11 @@ seedData.teachers = teacherCodes.map((code) => {
   ].sort();
   const overrideEmail = process.env[`FACULTY_${code}_EMAIL`];
   const overridePassword = process.env[`FACULTY_${code}_PASSWORD`];
-  const defaultPassword = `${code}@Uem2026`;
+  const defaultPassword = overridePassword || randomBytes(32).toString("hex");
   // Unlike admin/student, teacher codes are printed on the public class
-  // schedule (any student can see "LRG", "SBK", etc.), so the predictable
-  // "<CODE>@Uem2026" fallback is guessable by anyone with a timetable - not
-  // just someone with access to a leaked credentials PDF. Refuse to boot in
-  // production unless this teacher has a real FACULTY_<CODE>_PASSWORD, or
-  // the operator has explicitly acknowledged running with demo passwords via
-  // ALLOW_DEMO_TEACHER_PASSWORDS=true (e.g. for a staging/demo deployment).
+  // Teacher codes are public in the schedule. Refuse production startup unless
+  // each teacher has an explicit password, or the operator opts into staging
+  // mode with ALLOW_DEMO_TEACHER_PASSWORDS=true.
   if (
     process.env.NODE_ENV === "production" &&
     !overridePassword &&
@@ -706,12 +704,8 @@ seedData.teachers = teacherCodes.map((code) => {
         `Set it, or set ALLOW_DEMO_TEACHER_PASSWORDS=true to explicitly allow the public demo password for teachers you haven't migrated yet.`
     );
   }
-  // Real, individually-set passwords (via FACULTY_<CODE>_PASSWORD) get a full
-  // strength bcrypt cost. The public, already-documented demo default
-  // ("<CODE>@Uem2026") gets a much cheaper cost — hashing it expensively buys
-  // no real security since the value itself is public, and doing this for
-  // every one of the ~110+ teacher accounts on every server start was
-  // previously blocking the event loop for several seconds at startup.
+  // Explicitly configured credentials use the full bcrypt cost; generated
+  // local-only credentials use a lower cost to keep test startup responsive.
   const hashCost = overridePassword ? 12 : 4;
   return {
     id: `tch-${code.toLowerCase()}`,
@@ -729,14 +723,14 @@ seedData.teachers = teacherCodes.map((code) => {
 });
 
 // Automated demos may use one documented identity across the three role
-// selectors. Keep this opt-in in production: password123 is intentionally
-// suitable only for local/staging smoke tests, never for a real deployment.
+// selectors. Keep this opt-in in production and provide the password through
+// DEMO_LOGIN_PASSWORD rather than source code.
 const demoLoginEnabled = process.env.NODE_ENV !== "production"
   ? process.env.ALLOW_DEMO_LOGIN !== "false"
   : process.env.ALLOW_DEMO_LOGIN === "true";
 if (demoLoginEnabled) {
   const demoEmail = process.env.DEMO_LOGIN_EMAIL || "example@gmail.com";
-  const demoPassword = process.env.DEMO_LOGIN_PASSWORD || "password123";
+  const demoPassword = seedSecret("DEMO_LOGIN_PASSWORD", "");
   const demoHash = bcrypt.hashSync(demoPassword, 12);
 
   seedData.admins.push({
@@ -787,7 +781,7 @@ if (!seedData.teachers.some((teacher) => teacher.id === facultyDemoId)) {
     name: "E2E Faculty",
     department: "Computer Science",
     email: "faculty-demo@example.edu",
-    password: bcrypt.hashSync("faculty-demo-2026", 10),
+    password: bcrypt.hashSync(e2eFacultyPassword, 10),
     passwordVersion: 0,
     role: "teacher",
     phone: "",
@@ -801,7 +795,7 @@ if (!seedData.admins.some((admin) => admin.id === adminDemoId)) {
     id: adminDemoId,
     name: "E2E Administrator",
     email: "admin-demo@example.edu",
-    password: bcrypt.hashSync("admin-demo-2026", 10),
+    password: bcrypt.hashSync(e2eAdminPassword, 10),
     passwordVersion: 0,
     role: "admin"
   });

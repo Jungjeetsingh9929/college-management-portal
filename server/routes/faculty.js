@@ -2,10 +2,11 @@ import { Router } from "express";
 import { makeId, readDb, writeDb } from "../db/fileStore.js";
 import { requireAuth, requireFaculty as requireTeacher } from "../middleware/auth.js";
 import { classesTaughtByTeacher, scheduleBelongsToTeacher } from "../services/accessService.js";
-import { rateLimit } from "../middleware/rateLimit.js";
+import { rateConfig, rateLimit } from "../middleware/rateLimit.js";
 import { parseAnswerIndex, requiredText } from "../services/validation.js";
 
 export const facultyRouter = Router();
+const quizCreateConfig = rateConfig("FACULTY_QUIZ_CREATE", { windowMs: 5 * 60 * 1000, limit: 30 });
 
 // 1. Get schedule for logged-in teacher
 facultyRouter.get("/schedule", requireAuth, requireTeacher, async (req, res) => {
@@ -55,7 +56,8 @@ facultyRouter.post("/assignments", requireAuth, requireTeacher, async (req, res)
     safeTitle = requiredText(title, "Title", { max: 160 });
     safeDescription = description ? requiredText(description, "Description", { max: 2000 }) : "";
   } catch (err) {
-    return res.status(400).json({ message: err.message });
+    console.warn("Assignment validation failed", err);
+    return res.status(400).json({ message: "Invalid assignment details." });
   }
   if (!className || !dueDate) {
     return res.status(400).json({ message: "className and dueDate are required." });
@@ -97,7 +99,8 @@ facultyRouter.put("/assignments/:id", requireAuth, requireTeacher, async (req, r
     safeTitle = requiredText(title, "Title", { max: 160 });
     safeDescription = description ? requiredText(description, "Description", { max: 2000 }) : "";
   } catch (err) {
-    return res.status(400).json({ message: err.message });
+    console.warn("Assignment validation failed", err);
+    return res.status(400).json({ message: "Invalid assignment details." });
   }
   if (!className || !dueDate) {
     return res.status(400).json({ message: "className and dueDate are required." });
@@ -162,8 +165,7 @@ facultyRouter.get("/quizzes", requireAuth, requireTeacher, async (req, res) => {
 });
 
 facultyRouter.post("/quizzes", requireAuth, requireTeacher, rateLimit({
-  windowMs: 5 * 60 * 1000,
-  limit: 30,
+  ...quizCreateConfig,
   message: "Too many quiz requests. Please try again later."
 }), async (req, res) => {
   const db = await readDb();

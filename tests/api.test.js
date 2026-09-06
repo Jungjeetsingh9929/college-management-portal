@@ -3,6 +3,10 @@ process.env.JWT_SECRET = "test-attendance-secret-32-chars-long";
 process.env.SEED_ADMIN_EMAIL = "admin@example.edu";
 process.env.SEED_ADMIN_PASSWORD = "test-admin-password";
 process.env.SEED_STUDENT_PASSWORD = "test-student-password";
+process.env.E2E_FACULTY_PASSWORD = "test-e2e-faculty-password";
+process.env.E2E_ADMIN_PASSWORD = "test-e2e-admin-password";
+process.env.DEMO_LOGIN_PASSWORD = "test-demo-login-password";
+process.env.FACULTY_LRG_PASSWORD = "test-lrg-faculty-password";
 process.env.COLLEGE_LATITUDE = "27.2124649";
 process.env.COLLEGE_LONGITUDE = "75.7002425";
 process.env.COLLEGE_RADIUS_METERS = "300";
@@ -34,6 +38,15 @@ async function json(path, options = {}) {
 }
 
 try {
+  const health = await request("/health");
+  assert.equal(health.response.status, 200);
+  assert.equal(health.response.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(health.response.headers.get("x-frame-options"), "DENY");
+  assert.equal(health.response.headers.get("cache-control"), "no-store");
+  const missingRoute = await request("/does-not-exist");
+  assert.equal(missingRoute.response.status, 404);
+  assert.deepEqual(missingRoute.data, { message: "API route not found." });
+
   const admin = await json("/auth/login", {
     method: "POST",
     body: JSON.stringify({
@@ -58,7 +71,7 @@ try {
     method: "POST",
     body: JSON.stringify({
       email: "lrg@example.edu",
-      password: "LRG@Uem2026",
+      password: process.env.FACULTY_LRG_PASSWORD,
       role: "teacher"
     })
   });
@@ -67,7 +80,7 @@ try {
   for (const expectedRole of ["admin", "teacher", "student"]) {
     const demoLogin = await json("/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email: "example@gmail.com", password: "password123", role: expectedRole })
+      body: JSON.stringify({ email: "example@gmail.com", password: process.env.DEMO_LOGIN_PASSWORD, role: expectedRole })
     });
     assert.equal(demoLogin.user.role, expectedRole);
   }

@@ -53,12 +53,9 @@ cp .env.example .env
 ```
 
 Replace every placeholder in `.env` with unique local values before starting the
-server. `JWT_SECRET` must be at least 32 characters. Each seeded teacher gets
-its own predictable demo login of the form `<code>@example.edu` /
-`<CODE>@Uem2026` (e.g. `lrg@example.edu` / `LRG@Uem2026`) — see
-`server/db/teacherLegend.js` for the full code list. To give an individual
-faculty member a real login instead, set `FACULTY_<CODE>_EMAIL` and
-`FACULTY_<CODE>_PASSWORD` in `.env`.
+server. `JWT_SECRET` must be at least 32 characters. Configure each faculty
+account through `FACULTY_<CODE>_EMAIL` and `FACULTY_<CODE>_PASSWORD`; never rely
+on predictable demo passwords in a shared or production environment.
 
 ### Geofenced quiz attendance
 

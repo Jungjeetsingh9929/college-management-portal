@@ -3,7 +3,7 @@ import { Router } from "express";
 import { makeId, readDb, writeDb } from "../db/fileStore.js";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
 import { publicStudent } from "../services/attendanceService.js";
-import { PASSWORD_REQUIREMENTS, validPassword } from "../services/validation.js";
+import { PASSWORD_REQUIREMENTS, requiredText, validEmail, validPassword, validateKeys } from "../services/validation.js";
 
 export const studentsRouter = Router();
 
@@ -39,10 +39,12 @@ studentsRouter.post("/me/status-request", requireAuth, async (req, res) => {
   const db = await readDb();
   const student = db.students.find((item) => item.id === req.user.id);
   if (!student) return res.status(404).json({ message: "Student not found." });
+  try { validateKeys(req.body || {}, ["requestedStatus", "reason"]); } catch { return res.status(400).json({ message: "Invalid status request." }); }
   const requestedStatus = String(req.body.requestedStatus || "").trim().toLowerCase();
   if (!["pending", "approved", "rejected"].includes(requestedStatus)) {
     return res.status(400).json({ message: "Choose a valid requested status." });
   }
+  if (typeof req.body.reason !== "string" || req.body.reason.length > 1000) return res.status(400).json({ message: "Reason is invalid." });
   student.statusUpdateRequest = {
     requestedStatus,
     reason: String(req.body.reason || "").trim(),
@@ -107,12 +109,16 @@ studentsRouter.post("/pending/:id/reject", requireAuth, requireAdmin, async (req
 
 studentsRouter.post("/", requireAuth, requireAdmin, async (req, res) => {
   const db = await readDb();
+  try { validateKeys(req.body || {}, ["name", "rollNumber", "className", "department", "email", "password", "phone", "guardian", "graduationYear"]); } catch { return res.status(400).json({ message: "Invalid student data." }); }
+  if (!validEmail(req.body.email)) return res.status(400).json({ message: "Email is invalid." });
+  let name;
+  try { name = requiredText(req.body.name, "Name", { max: 120 }); } catch { return res.status(400).json({ message: "Name is invalid." }); }
   if (!validPassword(req.body.password)) {
     return res.status(400).json({ message: `A ${PASSWORD_REQUIREMENTS.toLowerCase()} is required when creating a student.` });
   }
   const student = {
     id: makeId("stu"),
-    name: req.body.name,
+    name,
     rollNumber: req.body.rollNumber,
     className: req.body.className,
     department: req.body.department,
@@ -131,6 +137,8 @@ studentsRouter.post("/", requireAuth, requireAdmin, async (req, res) => {
 
 studentsRouter.put("/:id", requireAuth, requireAdmin, async (req, res) => {
   const db = await readDb();
+  try { validateKeys(req.body || {}, ["name", "rollNumber", "className", "department", "email", "password", "phone", "guardian", "graduationYear"]); } catch { return res.status(400).json({ message: "Invalid student data." }); }
+  if (req.body.email !== undefined && !validEmail(req.body.email)) return res.status(400).json({ message: "Email is invalid." });
   const student = db.students.find((item) => item.id === req.params.id);
   if (!student) return res.status(404).json({ message: "Student not found." });
 

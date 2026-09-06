@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { makeId, readDb, writeDb } from "../db/fileStore.js";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
+import { enumValue, requiredText, validateKeys, validTime } from "../services/validation.js";
 
 export const schedulesRouter = Router();
 
@@ -26,22 +27,25 @@ schedulesRouter.get("/", requireAuth, async (req, res) => {
 schedulesRouter.post("/", requireAuth, requireAdmin, async (req, res) => {
   const db = await readDb();
   db.schedules ||= [];
-  const required = ["day", "section", "period", "startTime", "endTime", "subject", "teacher", "room"];
-  if (required.some((field) => !req.body[field])) {
-    return res.status(400).json({ message: "Day, section, period, time, subject, teacher, and room are required." });
-  }
+  try { validateKeys(req.body || {}, ["day", "section", "period", "startTime", "endTime", "subject", "teacher", "room", "activity", "notes"]); } catch { return res.status(400).json({ message: "Invalid timetable data." }); }
+  let day, section, subject, teacher, room, activity, notes;
+  try {
+    day = enumValue(req.body.day, "Day", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]);
+    section = requiredText(req.body.section, "Section", { max: 80 });
+    subject = requiredText(req.body.subject, "Subject", { max: 120 });
+    teacher = requiredText(req.body.teacher, "Teacher", { max: 120 });
+    room = requiredText(req.body.room, "Room", { max: 40 });
+    activity = req.body.activity === undefined ? "Lecture" : requiredText(req.body.activity, "Activity", { max: 60 });
+    notes = req.body.notes === undefined ? "" : requiredText(req.body.notes, "Notes", { min: 0, max: 500 });
+  } catch { return res.status(400).json({ message: "Invalid timetable data." }); }
+  const period = Number(req.body.period);
+  if (!Number.isInteger(period) || period < 1 || period > 12 || !validTime(req.body.startTime) || !validTime(req.body.endTime)) return res.status(400).json({ message: "Period and times are invalid." });
   const schedule = {
     id: makeId("sch"),
-    day: req.body.day,
-    section: req.body.section,
-    room: req.body.room,
-    period: Number(req.body.period),
+    day, section, room, period,
     startTime: req.body.startTime,
     endTime: req.body.endTime,
-    subject: req.body.subject,
-    teacher: req.body.teacher,
-    activity: req.body.activity || "Lecture",
-    notes: req.body.notes || ""
+    subject, teacher, activity, notes
   };
   db.schedules.push(schedule);
   await writeDb(db);
@@ -51,8 +55,14 @@ schedulesRouter.post("/", requireAuth, requireAdmin, async (req, res) => {
 schedulesRouter.put("/:id", requireAuth, requireAdmin, async (req, res) => {
   const db = await readDb();
   db.schedules ||= [];
+  try { validateKeys(req.body || {}, ["day", "section", "period", "startTime", "endTime", "subject", "teacher", "room", "activity", "notes"]); } catch { return res.status(400).json({ message: "Invalid timetable data." }); }
   const schedule = db.schedules.find((item) => item.id === req.params.id);
   if (!schedule) return res.status(404).json({ message: "Schedule item not found." });
+  if (req.body.period !== undefined && (!Number.isInteger(Number(req.body.period)) || Number(req.body.period) < 1 || Number(req.body.period) > 12)) return res.status(400).json({ message: "Period is invalid." });
+  if ((req.body.startTime !== undefined && !validTime(req.body.startTime)) || (req.body.endTime !== undefined && !validTime(req.body.endTime))) return res.status(400).json({ message: "Time is invalid." });
+  for (const [field, max] of [["section", 80], ["subject", 120], ["teacher", 120], ["room", 40], ["activity", 60], ["notes", 500]]) {
+    if (req.body[field] !== undefined) { try { requiredText(req.body[field], field, { min: 0, max }); } catch { return res.status(400).json({ message: "Invalid timetable data." }); } }
+  }
   ["day", "section", "room", "startTime", "endTime", "subject", "teacher", "activity", "notes"].forEach((field) => {
     if (req.body[field] !== undefined) schedule[field] = req.body[field];
   });

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { makeId, readDb, writeDb } from "../db/fileStore.js";
 import { requireAuth, requireStaff } from "../middleware/auth.js";
+import { enumValue, requiredText, validateKeys } from "../services/validation.js";
 
 export const complaintsRouter = Router();
 
@@ -45,20 +46,23 @@ complaintsRouter.post("/", requireAuth, async (req, res) => {
     return res.status(403).json({ message: "Your student ID is not approved yet." });
   }
 
-  if (!req.body.title || !req.body.category || !req.body.description) {
-    return res.status(400).json({ message: "Title, category, and description are required." });
-  }
+  try { validateKeys(req.body || {}, ["title", "category", "description", "location", "priority"]); } catch { return res.status(400).json({ message: "Invalid complaint data." }); }
+  let title, category, description, location, priority;
+  try {
+    title = requiredText(req.body.title, "Title", { max: 160 });
+    category = requiredText(req.body.category, "Category", { max: 80 });
+    description = requiredText(req.body.description, "Description", { max: 3000 });
+    location = req.body.location === undefined ? "" : requiredText(req.body.location, "Location", { min: 0, max: 160 });
+    priority = req.body.priority === undefined ? "medium" : enumValue(req.body.priority, "Priority", ["low", "medium", "high"]);
+  } catch { return res.status(400).json({ message: "Invalid complaint data." }); }
 
   const now = new Date().toISOString();
   const complaint = {
     id: makeId("cmp"),
     studentId: student.id,
-    title: req.body.title,
-    category: req.body.category,
-    location: req.body.location || "",
-    priority: req.body.priority || "medium",
+    title, category, location, priority,
     status: "pending",
-    description: req.body.description,
+    description,
     response: "",
     createdAt: now,
     updatedAt: now
@@ -71,8 +75,19 @@ complaintsRouter.post("/", requireAuth, async (req, res) => {
 complaintsRouter.put("/:id", requireAuth, requireStaff, async (req, res) => {
   const db = await readDb();
   db.complaints ||= [];
+  try { validateKeys(req.body || {}, ["status", "priority", "response", "category", "location"]); } catch { return res.status(400).json({ message: "Invalid complaint update." }); }
   const complaint = db.complaints.find((item) => item.id === req.params.id);
   if (!complaint) return res.status(404).json({ message: "Complaint not found." });
+
+  if (req.body.status !== undefined && !["pending", "in-progress", "resolved"].includes(req.body.status)) {
+    return res.status(400).json({ message: "Invalid complaint status." });
+  }
+  if (req.body.priority !== undefined && !["low", "medium", "high"].includes(req.body.priority)) {
+    return res.status(400).json({ message: "Invalid complaint priority." });
+  }
+  for (const [field, max] of [["response", 3000], ["category", 80], ["location", 160]]) {
+    if (req.body[field] !== undefined) { try { requiredText(req.body[field], field, { min: 0, max }); } catch { return res.status(400).json({ message: "Invalid complaint update." }); } }
+  }
 
   ["status", "priority", "response", "category", "location"].forEach((field) => {
     if (req.body[field] !== undefined) complaint[field] = req.body[field];

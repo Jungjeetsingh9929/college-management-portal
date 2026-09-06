@@ -3,6 +3,8 @@ process.env.JWT_SECRET = "test-attendance-secret-32-chars-long";
 process.env.SEED_ADMIN_EMAIL = "admin@example.edu";
 process.env.SEED_ADMIN_PASSWORD = "test-admin-password";
 process.env.SEED_STUDENT_PASSWORD = "test-student-password";
+process.env.E2E_FACULTY_PASSWORD = "test-e2e-faculty-password";
+process.env.E2E_ADMIN_PASSWORD = "test-e2e-admin-password";
 
 import assert from "node:assert/strict";
 const { resetDb } = await import("../server/db/fileStore.js");
@@ -19,9 +21,9 @@ async function call(path, options = {}) {
 }
 try {
   const admin = await call("/auth/login", { method: "POST", body: JSON.stringify({ email: "admin@example.edu", password: "test-admin-password", role: "admin" }) });
-  const e2eAdmin = await call("/auth/login", { method: "POST", body: JSON.stringify({ email: "admin-demo@example.edu", password: "admin-demo-2026", role: "admin" }) });
+  const e2eAdmin = await call("/auth/login", { method: "POST", body: JSON.stringify({ email: "admin-demo@example.edu", password: process.env.E2E_ADMIN_PASSWORD, role: "admin" }) });
   const student = await call("/auth/login", { method: "POST", body: JSON.stringify({ email: "student001@example.edu", password: "test-student-password", role: "student" }) });
-  const faculty = await call("/auth/login", { method: "POST", body: JSON.stringify({ email: "faculty-demo@example.edu", password: "faculty-demo-2026", role: "teacher" }) });
+  const faculty = await call("/auth/login", { method: "POST", body: JSON.stringify({ email: "faculty-demo@example.edu", password: process.env.E2E_FACULTY_PASSWORD, role: "teacher" }) });
   const studentHeaders = { Authorization: `Bearer ${student.token}` };
   const adminHeaders = { Authorization: `Bearer ${admin.token}` };
   const e2eAdminHeaders = { Authorization: `Bearer ${e2eAdmin.token}` };

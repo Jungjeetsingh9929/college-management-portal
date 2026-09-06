@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { makeId, readDb, writeDb } from "../db/fileStore.js";
 import { requireAuth } from "../middleware/auth.js";
-import { clientKey, rateLimit } from "../middleware/rateLimit.js";
+import { clientKey, rateConfig, rateLimit } from "../middleware/rateLimit.js";
 import { parseAnswerIndex, requiredText } from "../services/validation.js";
 import { getCollegeGeofence, isWithinCollege } from "../utils/geo.js";
 
@@ -63,8 +63,7 @@ sharedRouter.get("/student/assignments", requireAuth, async (req, res) => {
 });
 
 const completeRateLimit = rateLimit({
-  windowMs: 5 * 60 * 1000,
-  limit: 20,
+  ...rateConfig("STUDENT_COMPLETION", { windowMs: 5 * 60 * 1000, limit: 20 }),
   message: "Too many completion toggles. Please try again later.",
   keyGenerator: (req) => req.user?.id || clientKey(req)
 });
@@ -208,8 +207,7 @@ sharedRouter.get("/quiz/:id", requireAuth, async (req, res) => {
 
 // 3. Student route: Answer quiz and mark attendance
 sharedRouter.post("/student/quiz/:id/answer", requireAuth, rateLimit({
-  windowMs: 5 * 60 * 1000,
-  limit: 10,
+  ...rateConfig("STUDENT_QUIZ_ANSWER", { windowMs: 5 * 60 * 1000, limit: 10 }),
   message: "Too many quiz submissions. Please try again later.",
   keyGenerator: (req) => req.user?.id || clientKey(req)
 }), async (req, res) => {

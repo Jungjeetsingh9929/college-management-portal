@@ -1140,51 +1140,6 @@ td span {
   margin-bottom: 0;
 }
 
-.face-enroll-box {
-  background: #f7f7f7;
-  border: 1px solid #cccccc;
-  border-radius: 3px;
-  display: grid;
-  gap: 10px;
-  grid-column: 1 / -1;
-  padding: 12px;
-}
-
-.face-enroll-box strong,
-.face-enroll-box span {
-  display: block;
-}
-
-.face-enroll-box span {
-  color: var(--muted);
-  font-size: 0.82rem;
-  margin-top: 3px;
-}
-
-.upload-button input {
-  display: none;
-}
-
-.face-preview {
-  border: 1px solid #cccccc;
-  height: 92px;
-  object-fit: cover;
-  width: 122px;
-}
-
-.camera-preview {
-  background: #222222;
-  border: 1px solid #cccccc;
-  display: block;
-  min-height: 170px;
-  width: 100%;
-}
-
-.small-camera {
-  min-height: 120px;
-  max-width: 220px;
-}
-
 .code-box {
   background: #ffffff;
   border: 1px solid #cccccc;

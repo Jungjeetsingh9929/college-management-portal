@@ -15,7 +15,7 @@ import { teachersRouter } from "./routes/teachers.js";
 import { facultyRouter } from "./routes/faculty.js";
 import { sharedRouter } from "./routes/shared.js";
 import { adminRouter } from "./routes/admin.js";
-import { rateLimit } from "./middleware/rateLimit.js";
+import { rateConfig, rateLimit } from "./middleware/rateLimit.js";
 
 const app = express();
 app.set("trust proxy", process.env.TRUST_PROXY || 1);
@@ -44,6 +44,9 @@ app.use((req, res, next) => {
   res.set("X-Content-Type-Options", "nosniff");
   res.set("X-Frame-Options", "DENY");
   res.set("Referrer-Policy", "same-origin");
+  res.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(self)");
+  if (req.path.startsWith("/api")) res.set("Cache-Control", "no-store");
+  if (process.env.NODE_ENV === "production") res.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   next();
 });
 
@@ -52,8 +55,7 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api/auth", rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 100,
+  ...rateConfig("AUTH_API", { windowMs: 15 * 60 * 1000, limit: 100, backoffBaseMs: 500, backoffMaxMs: 60 * 1000 }),
   message: "Too many authentication requests. Please try again later."
 }), authRouter);
 app.use("/api/students", studentsRouter);
@@ -73,7 +75,7 @@ app.use("/api", (_req, res) => {
 
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(distPath));
-  app.get("*", (_req, res) => {
+  app.get("/{*splat}", (_req, res) => {
     res.sendFile(path.join(distPath, "index.html"));
   });
 }
