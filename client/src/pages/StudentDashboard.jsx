@@ -7,7 +7,6 @@ import { apiFetch } from "../context/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { sortAssignmentsByUrgency } from "../utils/assignments.js";
 import { getUpcomingHolidays } from "../utils/dates.js";
-import { StudentRecords } from "./StudentRecords.jsx";
 
 export function StudentDashboard() {
   const { user } = useAuth();
@@ -169,7 +168,6 @@ export function StudentDashboard() {
           ))}
         </div>
       </section>
-      <StudentRecords />
     </div>
   );
 }
