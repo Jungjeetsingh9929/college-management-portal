@@ -1,10 +1,15 @@
-import React from "react";
+import React, { useState } from "react";
 import { Mail, Phone, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
+import { apiFetch } from "../context/api.js";
 
 export function StudentProfile() {
   const { user } = useAuth();
+  const [requestedStatus, setRequestedStatus] = useState(user.approvalStatus || "approved");
+  const [reason, setReason] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
   const details = [
     ["Roll number", user.rollNumber],
     ["Class", user.className],
@@ -36,7 +41,53 @@ export function StudentProfile() {
                 <strong>{value}</strong>
               </div>
             ))}
-            <p className="helper-text">Approval status is managed by the administration and cannot be edited by students. Need an update? <Link to="/complaints">Contact the administration through Complaints.</Link></p>
+            <div className="status-request-box">
+              <h3>Update approval status</h3>
+              <p className="helper-text">
+                The administration makes the final approval decision. Submit a request for review below.
+              </p>
+              <form className="form-stack" onSubmit={async (event) => {
+                event.preventDefault();
+                setMessage("");
+                setError("");
+                try {
+                  const data = await apiFetch("/students/me/status-request", {
+                    method: "POST",
+                    body: JSON.stringify({ requestedStatus, reason })
+                  });
+                  setMessage(data.message);
+                  setReason("");
+                } catch (err) {
+                  setError(err.message);
+                }
+              }}>
+                <label>
+                  Requested status
+                  <select value={requestedStatus} onChange={(event) => setRequestedStatus(event.target.value)}>
+                    <option value="pending">Pending review</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </label>
+                <label>
+                  Reason
+                  <textarea
+                    required
+                    value={reason}
+                    placeholder="Explain why your status should be reviewed"
+                    onChange={(event) => setReason(event.target.value)}
+                  />
+                </label>
+                <button className="primary-button" type="submit">
+                  Update approval status
+                </button>
+              </form>
+              {message && <div role="status" className="success-box">{message}</div>}
+              {error && <div role="alert" className="error-box">{error}</div>}
+            </div>
+            <p className="helper-text">
+              You can also <Link to="/complaints">contact the administration through Complaints.</Link>
+            </p>
           </div>
         </article>
         <article className="panel">
