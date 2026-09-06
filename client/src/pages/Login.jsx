@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { ScanLine } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 
 export function Login() {
@@ -21,8 +21,10 @@ export function Login() {
   });
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   function switchRole(nextRole) {
     setRole(nextRole);
@@ -32,13 +34,22 @@ export function Login() {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (submitting) return;
     setError("");
     setMessage("");
+    setSubmitting(true);
     try {
-      const user = await login({ email, password, role });
-      navigate(user.role === "admin" ? "/admin" : user.role === "teacher" ? "/faculty" : "/student");
+      const user = await Promise.race([
+        login({ email, password, role }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Login timed out. Please check the server and try again.")), 15000))
+      ]);
+      const requestedPath = new URLSearchParams(location.search).get("returnTo");
+      const returnTo = requestedPath && requestedPath.startsWith("/") && !requestedPath.startsWith("//") ? requestedPath : "";
+      navigate(returnTo || (user.role === "admin" ? "/admin" : user.role === "teacher" ? "/faculty" : "/student"));
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Login failed. Please verify your credentials and role.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -143,8 +154,8 @@ export function Login() {
             <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="new-password" required />
           </label>
           {error && <div className="error-box">{error}</div>}
-          <button className="primary-button full" type="submit">
-            Login
+          <button className="primary-button full" type="submit" disabled={submitting} aria-busy={submitting}>
+            {submitting ? "Signing in…" : "Login"}
           </button>
         </form>
         )}

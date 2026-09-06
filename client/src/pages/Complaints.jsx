@@ -60,9 +60,13 @@ export function Complaints() {
       setComplaints((current) => [data.complaint, ...current.filter((item) => item.id !== data.complaint.id)]);
       setOpenComplaintId(data.complaint.id);
       // Keep the just-created record visible even if a subsequent refresh is
-      // interrupted by a transient network failure.
+      // stale or interrupted by a transient network failure.
       try {
-        await loadComplaints();
+        const refreshed = await apiFetch("/complaints");
+        setComplaints((current) => [
+          ...refreshed.complaints,
+          ...current.filter((item) => !refreshed.complaints.some((saved) => saved.id === item.id))
+        ]);
       } catch {
         // The POST succeeded and the local list already contains the record.
       }
@@ -73,9 +77,17 @@ export function Complaints() {
   }
 
   async function updateComplaint(id, patch) {
-    const data = await apiFetch(`/complaints/${id}`, { method: "PUT", body: JSON.stringify(patch) });
-    setMessage(data.message);
-    loadComplaints();
+    setMessage("");
+    setMessageType("");
+    try {
+      const data = await apiFetch(`/complaints/${id}`, { method: "PUT", body: JSON.stringify(patch) });
+      setMessage(data.message || "Complaint updated successfully.");
+      setMessageType("success");
+      await loadComplaints();
+    } catch (error) {
+      setMessage(error.message);
+      setMessageType("error");
+    }
   }
 
   return (
@@ -133,8 +145,8 @@ export function Complaints() {
       <section className="panel">
         <div className="section-heading">
           <div>
-            <span className="eyebrow">{user.role === "admin" ? "Admin desk" : "My requests"}</span>
-            <h2>{user.role === "admin" ? "Manage complaints" : "Complaint status"}</h2>
+          <span className="eyebrow">{user.role === "student" ? "My requests" : "Staff desk"}</span>
+          <h2>{user.role === "student" ? "Complaint status" : "Manage complaints"}</h2>
           </div>
           <ClipboardList size={22} />
         </div>
@@ -155,7 +167,7 @@ export function Complaints() {
                   <div>
                     <strong>{complaint.title}</strong>
                     <span>{complaint.category} · {complaint.location || "No location"}</span>
-                    {user.role === "admin" && <span>{complaint.studentName} · {complaint.rollNumber}</span>}
+                    {user.role !== "student" && <span>{complaint.studentName} · {complaint.rollNumber}</span>}
                   </div>
                   <div className="badge-row">
                     <Badge value={complaint.priority} />
@@ -179,7 +191,7 @@ export function Complaints() {
                     <span>{complaint.response ? "Latest admin response is shown above." : "The administration has not added a response yet."}</span>
                   </div>
                 )}
-                {user.role === "admin" && (
+                {user.role !== "student" && (
                   <div className="admin-complaint-controls">
                     <select value={complaint.status} onChange={(e) => updateComplaint(complaint.id, { status: e.target.value })}>
                       {statusOptions.map((item) => <option key={item} value={item}>{item}</option>)}

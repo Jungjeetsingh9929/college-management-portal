@@ -1,6 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { AppLayout } from "./components/AppLayout.jsx";
 import { AdminDashboard } from "./pages/AdminDashboard.jsx";
@@ -13,6 +13,7 @@ import { Schedule } from "./pages/Schedule.jsx";
 import { StudentAssignments } from "./pages/StudentAssignments.jsx";
 import { StudentDashboard } from "./pages/StudentDashboard.jsx";
 import { StudentProfile } from "./pages/StudentProfile.jsx";
+import { StudentRecords } from "./pages/StudentRecords.jsx";
 import { AccountSettings } from "./pages/AccountSettings.jsx";
 import { SubjectManagement } from "./pages/SubjectManagement.jsx";
 import { Teachers } from "./pages/Teachers.jsx";
@@ -27,8 +28,12 @@ import "./styles.css";
 
 function ProtectedRoute({ children, role, roles }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <div className="screen-loader">Loading...</div>;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) {
+    const returnTo = `${location.pathname}${location.search}${location.hash}`;
+    return <Navigate to={`/login?returnTo=${encodeURIComponent(returnTo)}`} replace />;
+  }
   const allowedRoles = roles || (role ? [role] : null);
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to={user.role === "admin" ? "/admin" : user.role === "teacher" ? "/faculty" : "/student"} replace />;
@@ -97,6 +102,16 @@ function AppRoutes() {
           <ProtectedRoute role="student">
             <AppLayout>
               <StudentProfile />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/student-records"
+        element={
+          <ProtectedRoute role="student">
+            <AppLayout>
+              <StudentRecords />
             </AppLayout>
           </ProtectedRoute>
         }

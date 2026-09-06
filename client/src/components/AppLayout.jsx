@@ -25,6 +25,7 @@ export function AppLayout({ children }) {
     { to: "/mark-attendance", label: "Mark Attendance", icon: ClipboardCheck },
     { to: "/faculty/quiz-generate", label: "QR Attendance", icon: QrCode },
     { to: "/schedule", label: "Class Schedule", icon: CalendarDays },
+    { to: "/complaints", label: "Complaints", icon: ClipboardList },
     { to: "/year-schedule", label: "Year Schedule", icon: Calendar },
     { to: "/account", label: "Change Password", icon: KeyRound }
   ];
@@ -34,6 +35,7 @@ export function AppLayout({ children }) {
     { to: "/schedule", label: "Schedule", icon: CalendarDays },
     { to: "/teachers", label: "Teachers", icon: UsersRound },
     { to: "/complaints", label: "Complaints", icon: ClipboardList },
+    { to: "/student-records", label: "Student List", icon: UsersRound },
     { to: "/history", label: "History", icon: History },
     { to: "/profile", label: "Profile", icon: UserRound },
     { to: "/year-schedule", label: "Year Schedule", icon: Calendar },

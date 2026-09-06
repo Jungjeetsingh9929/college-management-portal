@@ -795,6 +795,17 @@ if (!seedData.teachers.some((teacher) => teacher.id === facultyDemoId)) {
     subjects: ["Data Structures", "Operating Systems"]
   });
 }
+const adminDemoId = "admin-e2e-demo";
+if (!seedData.admins.some((admin) => admin.id === adminDemoId)) {
+  seedData.admins.push({
+    id: adminDemoId,
+    name: "E2E Administrator",
+    email: "admin-demo@example.edu",
+    password: bcrypt.hashSync("admin-demo-2026", 10),
+    passwordVersion: 0,
+    role: "admin"
+  });
+}
 if (!seedData.schedules.some((schedule) => schedule.id === "sch-e2e-demo-monday-1")) {
   seedData.schedules.push(
     {

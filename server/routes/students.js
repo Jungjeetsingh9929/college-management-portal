@@ -34,6 +34,25 @@ studentsRouter.get("/", requireAuth, async (req, res) => {
   res.json({ students: students.map((student) => publicStudent(student, db.attendance)) });
 });
 
+studentsRouter.post("/me/status-request", requireAuth, async (req, res) => {
+  if (req.user.role !== "student") return res.status(403).json({ message: "Only students can request a status review." });
+  const db = await readDb();
+  const student = db.students.find((item) => item.id === req.user.id);
+  if (!student) return res.status(404).json({ message: "Student not found." });
+  const requestedStatus = String(req.body.requestedStatus || "").trim().toLowerCase();
+  if (!["pending", "approved", "rejected"].includes(requestedStatus)) {
+    return res.status(400).json({ message: "Choose a valid requested status." });
+  }
+  student.statusUpdateRequest = {
+    requestedStatus,
+    reason: String(req.body.reason || "").trim(),
+    createdAt: new Date().toISOString(),
+    status: "open"
+  };
+  await writeDb(db);
+  res.status(201).json({ success: true, message: "Status update request sent to the administration.", request: student.statusUpdateRequest });
+});
+
 studentsRouter.get("/pending", requireAuth, requireAdmin, async (_req, res) => {
   const db = await readDb();
   db.pendingStudents ||= [];

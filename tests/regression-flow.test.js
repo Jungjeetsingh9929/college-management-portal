@@ -19,15 +19,26 @@ async function call(path, options = {}) {
 }
 try {
   const admin = await call("/auth/login", { method: "POST", body: JSON.stringify({ email: "admin@example.edu", password: "test-admin-password", role: "admin" }) });
+  const e2eAdmin = await call("/auth/login", { method: "POST", body: JSON.stringify({ email: "admin-demo@example.edu", password: "admin-demo-2026", role: "admin" }) });
   const student = await call("/auth/login", { method: "POST", body: JSON.stringify({ email: "student001@example.edu", password: "test-student-password", role: "student" }) });
   const faculty = await call("/auth/login", { method: "POST", body: JSON.stringify({ email: "faculty-demo@example.edu", password: "faculty-demo-2026", role: "teacher" }) });
   const studentHeaders = { Authorization: `Bearer ${student.token}` };
   const adminHeaders = { Authorization: `Bearer ${admin.token}` };
+  const e2eAdminHeaders = { Authorization: `Bearer ${e2eAdmin.token}` };
   const facultyHeaders = { Authorization: `Bearer ${faculty.token}` };
+  const attendance = await call("/attendance", { headers: e2eAdminHeaders });
+  assert.ok(Array.isArray(attendance.attendance));
+  const studentRecords = await call("/students?q=student001", { headers: studentHeaders });
+  assert.equal(studentRecords.students.length, 1);
+  const statusRequest = await call("/students/me/status-request", { method: "POST", headers: studentHeaders, body: JSON.stringify({ requestedStatus: "approved", reason: "Please review my enrollment status." }) });
+  assert.equal(statusRequest.request.status, "open");
 
   const createdComplaint = await call("/complaints", { method: "POST", headers: studentHeaders, body: JSON.stringify({ title: "Broken projector", category: "Classroom", description: "Projector is not working", priority: "high" }) });
   const complaints = await call("/complaints", { headers: studentHeaders });
   assert.ok(complaints.complaints.some((item) => item.id === createdComplaint.complaint.id));
+  await call(`/complaints/${createdComplaint.complaint.id}`, { method: "PUT", headers: facultyHeaders, body: JSON.stringify({ status: "in-progress", response: "Faculty is reviewing this request." }) });
+  const updatedComplaint = await call("/complaints", { headers: studentHeaders });
+  assert.equal(updatedComplaint.complaints.find((item) => item.id === createdComplaint.complaint.id).status, "in-progress");
 
   const subjects = await call("/subjects", { headers: adminHeaders });
   const original = subjects.subjects.find((item) => item.subjectName === "Data Structures");
@@ -39,6 +50,18 @@ try {
   assert.equal(updated.schedule, "Tue, Thu 11:00");
 
   const schedules = await call("/schedules", { headers: adminHeaders });
+  const createdSchedule = await call("/schedules", {
+    method: "POST",
+    headers: adminHeaders,
+    body: JSON.stringify({ day: "Tuesday", section: "CSE 3A", room: "S304", period: 2, startTime: "10:20", endTime: "11:10", subject: "TestSubject42", teacher: "DEMO" })
+  });
+  const scheduleAfterCreate = await call("/schedules", { headers: adminHeaders });
+  assert.equal(scheduleAfterCreate.schedules.find((item) => item.id === createdSchedule.schedule.id).subject, "TestSubject42");
+  await call(`/schedules/${createdSchedule.schedule.id}`, { method: "PUT", headers: adminHeaders, body: JSON.stringify({ day: "Wednesday", room: "S305", period: 3, startTime: "11:10", endTime: "12:00", subject: "TestSubject42", teacher: "DEMO" }) });
+  const scheduleAfterEdit = await call("/schedules", { headers: adminHeaders });
+  const editedSchedule = scheduleAfterEdit.schedules.find((item) => item.id === createdSchedule.schedule.id);
+  assert.equal(editedSchedule.day, "Wednesday");
+  assert.equal(editedSchedule.room, "S305");
   const target = schedules.schedules.find((item) => item.id === "sch-e2e-demo-monday-1");
   assert.ok(target);
   await call(`/schedules/${target.id}`, { method: "DELETE", headers: adminHeaders });

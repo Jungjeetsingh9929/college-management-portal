@@ -5,6 +5,7 @@ The local/staging seed includes this faculty account for end-to-end testing:
 | Role | Email | Password | Expected seeded timetable |
 |---|---|---|---|
 | Faculty | `faculty-demo@example.edu` | `faculty-demo-2026` | CSE 3A, Data Structures and Operating Systems |
+| Admin | `admin-demo@example.edu` | `admin-demo-2026` | Subjects, timetable, complaints, and reports |
 
 Failed login attempts return the API error message in the visible login error panel.
 

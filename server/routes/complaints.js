@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { makeId, readDb, writeDb } from "../db/fileStore.js";
-import { requireAdmin, requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireStaff } from "../middleware/auth.js";
 
 export const complaintsRouter = Router();
 
@@ -68,7 +68,7 @@ complaintsRouter.post("/", requireAuth, async (req, res) => {
   res.status(201).json({ success: true, message: "Complaint submitted.", complaint: publicComplaint(complaint, db) });
 });
 
-complaintsRouter.put("/:id", requireAuth, requireAdmin, async (req, res) => {
+complaintsRouter.put("/:id", requireAuth, requireStaff, async (req, res) => {
   const db = await readDb();
   db.complaints ||= [];
   const complaint = db.complaints.find((item) => item.id === req.params.id);

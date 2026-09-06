@@ -104,13 +104,16 @@ export function Schedule() {
   async function saveSchedule(event) {
     event.preventDefault();
     setMessage("");
+    const wasEditing = Boolean(editingId);
+    const savedSection = form.section;
     try {
-      const path = editingId ? `/schedules/${editingId}` : "/schedules";
-      const data = await apiFetch(path, { method: editingId ? "PUT" : "POST", body: JSON.stringify(form) });
-      setMessage(editingId ? "Schedule updated." : "Schedule added.");
+      const path = wasEditing ? `/schedules/${editingId}` : "/schedules";
+      const data = await apiFetch(path, { method: wasEditing ? "PUT" : "POST", body: JSON.stringify(form) });
+      setSectionFilter(savedSection);
+      await loadSchedules();
+      setMessage(wasEditing ? "Schedule updated." : "Schedule added.");
       setEditingId("");
       setForm(applyPeriodTime(1, blankSchedule));
-      loadSchedules();
       return data;
     } catch (error) {
       setMessage(error.message);
