@@ -1,10 +1,15 @@
-import React from "react";
+import React, { useState } from "react";
 import { Mail, Phone, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
+import { apiFetch } from "../context/api.js";
 
 export function StudentProfile() {
   const { user } = useAuth();
+  const [requestedStatus, setRequestedStatus] = useState(user.approvalStatus || "approved");
+  const [reason, setReason] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
   const details = [
     ["Roll number", user.rollNumber],
     ["Class", user.className],
@@ -36,7 +41,42 @@ export function StudentProfile() {
                 <strong>{value}</strong>
               </div>
             ))}
-            <p className="helper-text">Approval status is managed by the administration and cannot be edited by students. Need an update? <Link to="/complaints">Contact the administration through Complaints.</Link></p>
+            <div className="status-request-box">
+              <h3>Update approval status</h3>
+              <p className="helper-text">The administration makes the final approval decision. You can submit a review request from here.</p>
+              <form className="form-stack" onSubmit={async (event) => {
+                event.preventDefault();
+                setMessage("");
+                setError("");
+                try {
+                  const data = await apiFetch("/students/me/status-request", {
+                    method: "POST",
+                    body: JSON.stringify({ requestedStatus, reason })
+                  });
+                  setMessage(data.message);
+                  setReason("");
+                } catch (err) {
+                  setError(err.message);
+                }
+              }}>
+                <label>
+                  Requested status
+                  <select value={requestedStatus} onChange={(event) => setRequestedStatus(event.target.value)}>
+                    <option value="pending">Pending review</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </label>
+                <label>
+                  Reason
+                  <textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Explain why your status should be reviewed" required />
+                </label>
+                <button className="primary-button" type="submit">Update approval status</button>
+              </form>
+              {message && <div role="status" className="success-box">{message}</div>}
+              {error && <div role="alert" className="error-box">{error}</div>}
+            </div>
+            <p className="helper-text">You can also <Link to="/complaints">contact the administration through Complaints.</Link></p>
           </div>
         </article>
         <article className="panel">
@@ -44,6 +84,16 @@ export function StudentProfile() {
           <div className="contact-row"><Mail size={18} /> {user.email}</div>
           <div className="contact-row"><Phone size={18} /> {user.phone || "-"}</div>
         </article>
+      </section>
+      <section className="panel">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">Student account</span>
+            <h2>Student List</h2>
+          </div>
+          <Link className="secondary-button" to="/student-records">Open search and status filter</Link>
+        </div>
+        <p className="helper-text">Use the dedicated Student List page to search your record and filter its approval status.</p>
       </section>
     </div>
   );

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { QrCode } from "lucide-react";
+import { apiFetch } from "../context/api.js";
 
 export function QuizGenerator() {
   const [quizzes, setQuizzes] = useState([]);
@@ -20,17 +21,11 @@ export function QuizGenerator() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [quizRes, stuRes, subjRes] = await Promise.all([
-          fetch("/api/faculty/quizzes", { headers: { Authorization: `Bearer ${localStorage.getItem("attendance_token")}` } }),
-          fetch("/api/faculty/students", { headers: { Authorization: `Bearer ${localStorage.getItem("attendance_token")}` } }),
-          fetch("/api/subjects", { headers: { Authorization: `Bearer ${localStorage.getItem("attendance_token")}` } })
+        const [quizData, stuData, subjData] = await Promise.all([
+          apiFetch("/faculty/quizzes"),
+          apiFetch("/faculty/students"),
+          apiFetch("/subjects")
         ]);
-        
-        if (!quizRes.ok || !stuRes.ok || !subjRes.ok) throw new Error("Failed to fetch data.");
-        
-        const quizData = await quizRes.json();
-        const stuData = await stuRes.json();
-        const subjData = await subjRes.json();
         
         setQuizzes(quizData.quizzes);
         setClasses(stuData.classes);
@@ -53,19 +48,10 @@ export function QuizGenerator() {
     setMessage("");
     setError("");
     try {
-      const res = await fetch("/api/faculty/quizzes", {
+      const { quiz } = await apiFetch("/faculty/quizzes", {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("attendance_token")}`
-        },
         body: JSON.stringify(form)
       });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Failed to create quiz");
-      }
-      const { quiz } = await res.json();
       setQuizzes(prev => [...prev, quiz]);
       setMessage("Quiz created successfully.");
       setForm({ ...form, question: "", options: ["", "", "", ""] });
@@ -76,14 +62,10 @@ export function QuizGenerator() {
 
   async function toggleActive(id) {
     try {
-      const res = await fetch(`/api/faculty/quizzes/${id}/toggle`, {
+      const { quiz } = await apiFetch(`/faculty/quizzes/${id}/toggle`, {
         method: "PUT",
-        headers: { Authorization: `Bearer ${localStorage.getItem("attendance_token")}` }
       });
-      if (res.ok) {
-        const { quiz } = await res.json();
-        setQuizzes(prev => prev.map(q => q.id === id ? quiz : q));
-      }
+      setQuizzes(prev => prev.map(q => q.id === id ? quiz : q));
     } catch (err) {
       alert("Failed to toggle");
     }
@@ -91,13 +73,10 @@ export function QuizGenerator() {
 
   async function handleDelete(id) {
     try {
-      const res = await fetch(`/api/faculty/quizzes/${id}`, {
+      await apiFetch(`/faculty/quizzes/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${localStorage.getItem("attendance_token")}` }
       });
-      if (res.ok) {
-        setQuizzes(prev => prev.filter(q => q.id !== id));
-      }
+      setQuizzes(prev => prev.filter(q => q.id !== id));
     } catch (err) {
       alert("Failed to delete");
     }

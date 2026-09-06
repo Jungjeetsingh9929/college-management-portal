@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { Badge } from "../components/UI.jsx";
+import { apiFetch } from "../context/api.js";
 
 function isOverdue(dueDate) {
   const today = new Date();
@@ -25,15 +26,10 @@ export function FacultyAssignments() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [assgnRes, stuRes] = await Promise.all([
-          fetch("/api/faculty/assignments", { headers: { Authorization: `Bearer ${localStorage.getItem("attendance_token")}` } }),
-          fetch("/api/faculty/students", { headers: { Authorization: `Bearer ${localStorage.getItem("attendance_token")}` } })
+        const [assgnData, stuData] = await Promise.all([
+          apiFetch("/faculty/assignments"),
+          apiFetch("/faculty/students")
         ]);
-        
-        if (!assgnRes.ok || !stuRes.ok) throw new Error("Failed to fetch data.");
-        
-        const assgnData = await assgnRes.json();
-        const stuData = await stuRes.json();
         
         setAssignments(assgnData.assignments);
         setClasses(stuData.classes);
@@ -54,21 +50,12 @@ export function FacultyAssignments() {
     setMessage("");
     setError("");
     try {
-      const url = editingId ? `/api/faculty/assignments/${editingId}` : "/api/faculty/assignments";
+      const url = editingId ? `/faculty/assignments/${editingId}` : "/faculty/assignments";
       const method = editingId ? "PUT" : "POST";
-      const res = await fetch(url, {
+      const { assignment } = await apiFetch(url, {
         method,
-        headers: { 
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("attendance_token")}`
-        },
         body: JSON.stringify(form)
       });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Failed to save assignment");
-      }
-      const { assignment } = await res.json();
       if (editingId) {
         setAssignments(prev => prev.map(a => a.id === editingId ? assignment : a));
         setMessage("Assignment updated successfully.");
@@ -105,13 +92,8 @@ export function FacultyAssignments() {
     setExpandedId(id);
     setSubmissions([]);
     try {
-      const res = await fetch(`/api/faculty/assignments/${id}/submissions`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("attendance_token")}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSubmissions(data.submissions);
-      }
+      const data = await apiFetch(`/faculty/assignments/${id}/submissions`);
+      setSubmissions(data.submissions);
     } catch (err) {
       console.error(err);
     }
@@ -119,13 +101,10 @@ export function FacultyAssignments() {
 
   async function handleDelete(id) {
     try {
-      const res = await fetch(`/api/faculty/assignments/${id}`, {
+      await apiFetch(`/faculty/assignments/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${localStorage.getItem("attendance_token")}` }
       });
-      if (res.ok) {
-        setAssignments(prev => prev.filter(a => a.id !== id));
-      }
+      setAssignments(prev => prev.filter(a => a.id !== id));
     } catch (err) {
       alert("Failed to delete");
     }

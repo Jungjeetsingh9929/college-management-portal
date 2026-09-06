@@ -20,6 +20,24 @@ export async function apiFetch(path, options = {}) {
   return response;
 }
 
+export async function apiDownload(path, options = {}) {
+  const token = localStorage.getItem("attendance_token");
+  const target = path.startsWith("http") ? path : `${API_BASE}${path}`;
+  const response = await fetch(target, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    }
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: "Download failed." }));
+    throw new Error(error.message || "Download failed.");
+  }
+  return response.blob();
+}
+
 export function reportUrl(type) {
   return `${API_BASE}/reports/${type}`;
 }

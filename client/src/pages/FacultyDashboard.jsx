@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Calendar } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { getUpcomingHolidays } from "../utils/dates.js";
+import { apiFetch } from "../context/api.js";
 
 export function FacultyDashboard() {
   const { user } = useAuth();
@@ -14,22 +15,13 @@ export function FacultyDashboard() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [stuRes, holRes] = await Promise.all([
-          fetch("/api/faculty/students", {
-            headers: { Authorization: `Bearer ${localStorage.getItem("attendance_token")}` }
-          }),
-          fetch("/api/shared/holidays", {
-            headers: { Authorization: `Bearer ${localStorage.getItem("attendance_token")}` }
-          })
+        const [data, holData] = await Promise.all([
+          apiFetch("/faculty/students"),
+          apiFetch("/shared/holidays")
         ]);
-        if (!stuRes.ok) throw new Error("Failed to fetch students.");
-        const data = await stuRes.json();
         setStudents(data.students);
         setClasses(data.classes);
-        if (holRes.ok) {
-          const holData = await holRes.json();
-          setHolidays(holData.holidays || []);
-        }
+        setHolidays(holData.holidays || []);
       } catch (err) {
         setError(err.message);
       } finally {

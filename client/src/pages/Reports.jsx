@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Download, FileText, Search } from "lucide-react";
 import { Badge, EmptyState } from "../components/UI.jsx";
-import { apiFetch, reportUrl } from "../context/api.js";
+import { apiDownload, apiFetch, reportUrl } from "../context/api.js";
 
 export function Reports() {
   const [records, setRecords] = useState([]);
@@ -9,6 +9,7 @@ export function Reports() {
   const [students, setStudents] = useState([]);
   const [query, setQuery] = useState("");
   const [subjectId, setSubjectId] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     Promise.all([apiFetch("/attendance"), apiFetch("/subjects"), apiFetch("/students")]).then(([attendance, subjectData, studentData]) => {
@@ -29,19 +30,20 @@ export function Reports() {
     });
   }, [records, query, subjectId]);
 
-  function download(type) {
-    const token = localStorage.getItem("attendance_token");
+  async function download(type) {
     const url = subjectId ? `${reportUrl(type)}?subjectId=${subjectId}` : reportUrl(type);
-    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-      .then((response) => response.blob())
-      .then((blob) => {
-        const urlObj = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
-        anchor.href = urlObj;
-        anchor.download = `attendance-report.${type}`;
-        anchor.click();
-        URL.revokeObjectURL(urlObj);
-      });
+    setError("");
+    try {
+      const blob = await apiDownload(url);
+      const urlObj = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = urlObj;
+      anchor.download = `attendance-report.${type}`;
+      anchor.click();
+      URL.revokeObjectURL(urlObj);
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   return (
@@ -68,6 +70,7 @@ export function Reports() {
             </button>
           </div>
         </div>
+        {error && <div role="alert" className="error-box">{error}</div>}
         <div className="toolbar">
           <label className="search-field">
             <Search size={17} />

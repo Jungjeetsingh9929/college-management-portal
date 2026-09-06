@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Calendar } from "lucide-react";
 import { getUpcomingHolidays } from "../utils/dates.js";
+import { apiFetch } from "../context/api.js";
 
 export function YearSchedule() {
   const [holidays, setHolidays] = useState([]);
@@ -10,11 +11,7 @@ export function YearSchedule() {
   useEffect(() => {
     async function fetchHolidays() {
       try {
-        const res = await fetch("/api/shared/holidays", {
-          headers: { Authorization: `Bearer ${localStorage.getItem("attendance_token")}` }
-        });
-        if (!res.ok) throw new Error("Failed to fetch year schedule.");
-        const data = await res.json();
+        const data = await apiFetch("/shared/holidays");
         
         // sort by date
         const sorted = data.holidays.sort((a, b) => new Date(a.date) - new Date(b.date));
