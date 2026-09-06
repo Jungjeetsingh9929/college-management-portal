@@ -51,7 +51,9 @@ export function Home() {
             <Link className="mini-grid-link" to="/login" aria-label="Open Attendance">
               Attendance
             </Link>
-            <div>Complaints</div>
+            <Link className="mini-grid-link" to="/complaints" aria-label="Open Complaints">
+              Complaints
+            </Link>
           </div>
         </div>
       </section>

@@ -44,6 +44,8 @@ export function SubjectManagement() {
   const [editingSubjectId, setEditingSubjectId] = useState("");
   const [classForm, setClassForm] = useState(blankClass);
   const [editingClassId, setEditingClassId] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
   async function loadData() {
     const data = await apiFetch("/subjects");
@@ -58,11 +60,19 @@ export function SubjectManagement() {
 
   async function saveSubject(event) {
     event.preventDefault();
-    const path = editingSubjectId ? `/subjects/${editingSubjectId}` : "/subjects";
-    await apiFetch(path, { method: editingSubjectId ? "PUT" : "POST", body: JSON.stringify(subjectForm) });
-    setSubjectForm(blankSubject);
-    setEditingSubjectId("");
-    loadData();
+    const wasEditing = Boolean(editingSubjectId);
+    setMessage("");
+    setError("");
+    try {
+      const path = wasEditing ? `/subjects/${editingSubjectId}` : "/subjects";
+      await apiFetch(path, { method: wasEditing ? "PUT" : "POST", body: JSON.stringify(subjectForm) });
+      setSubjectForm(blankSubject);
+      setEditingSubjectId("");
+      await loadData();
+      setMessage(wasEditing ? "Subject updated successfully." : "Subject added successfully.");
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   function editSubject(subject) {
@@ -78,17 +88,32 @@ export function SubjectManagement() {
   }
 
   async function deleteSubject(id) {
-    await apiFetch(`/subjects/${id}`, { method: "DELETE" });
-    loadData();
+    setMessage("");
+    setError("");
+    try {
+      await apiFetch(`/subjects/${id}`, { method: "DELETE" });
+      await loadData();
+      setMessage("Subject deleted successfully.");
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   async function addClass(event) {
     event.preventDefault();
-    const path = editingClassId ? `/subjects/classes/${editingClassId}` : "/subjects/classes";
-    await apiFetch(path, { method: editingClassId ? "PUT" : "POST", body: JSON.stringify(classForm) });
-    setClassForm({ ...blankClass, subjectId: classForm.subjectId });
-    setEditingClassId("");
-    loadData();
+    const wasEditing = Boolean(editingClassId);
+    setMessage("");
+    setError("");
+    try {
+      const path = wasEditing ? `/subjects/classes/${editingClassId}` : "/subjects/classes";
+      await apiFetch(path, { method: wasEditing ? "PUT" : "POST", body: JSON.stringify(classForm) });
+      setClassForm({ ...blankClass, subjectId: classForm.subjectId });
+      setEditingClassId("");
+      await loadData();
+      setMessage(wasEditing ? "Class timing updated successfully." : "Class timing added successfully.");
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   function editClass(classItem) {
@@ -109,8 +134,15 @@ export function SubjectManagement() {
   }
 
   async function deleteClass(id) {
-    await apiFetch(`/subjects/classes/${id}`, { method: "DELETE" });
-    loadData();
+    setMessage("");
+    setError("");
+    try {
+      await apiFetch(`/subjects/classes/${id}`, { method: "DELETE" });
+      await loadData();
+      setMessage("Class timing deleted successfully.");
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   return (
@@ -146,6 +178,8 @@ export function SubjectManagement() {
               </button>
             )}
           </form>
+          {message && <div role="status" className="success-box">{message}</div>}
+          {error && <div role="alert" className="error-box">{error}</div>}
           <div className="table-wrap">
             <table>
               <thead>

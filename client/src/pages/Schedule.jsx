@@ -135,9 +135,15 @@ export function Schedule() {
   }
 
   async function deleteSchedule(id) {
-    await apiFetch(`/schedules/${id}`, { method: "DELETE" });
-    setMessage("Schedule deleted.");
-    loadSchedules();
+    if (!window.confirm("Delete this timetable entry?")) return;
+    setMessage("");
+    try {
+      await apiFetch(`/schedules/${id}`, { method: "DELETE" });
+      await loadSchedules();
+      setMessage("Schedule deleted successfully.");
+    } catch (error) {
+      setMessage(error.message);
+    }
   }
 
   return (

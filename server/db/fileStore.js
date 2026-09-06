@@ -14,11 +14,18 @@ export async function ensureDatabase() {
     if (process.env.ALLOW_DEMO_LOGIN === "true") {
       const db = JSON.parse(await fs.readFile(dbPath, "utf8"));
       let changed = false;
-      for (const [collection, id] of [["admins", "admin-demo"], ["students", "stu-demo"], ["teachers", "tch-demo"]]) {
+      for (const [collection, id] of [["admins", "admin-demo"], ["students", "stu-demo"], ["teachers", "tch-demo"], ["teachers", "tch-e2e-demo"]]) {
         db[collection] ||= [];
         const account = (seedData[collection] || []).find((item) => item.id === id);
         if (account && !db[collection].some((item) => item.id === id)) {
           db[collection].push(account);
+          changed = true;
+        }
+      }
+      db.schedules ||= [];
+      for (const schedule of (seedData.schedules || []).filter((item) => String(item.id).startsWith("sch-e2e-demo-"))) {
+        if (!db.schedules.some((item) => item.id === schedule.id)) {
+          db.schedules.push(schedule);
           changed = true;
         }
       }

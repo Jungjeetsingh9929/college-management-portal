@@ -776,6 +776,56 @@ if (demoLoginEnabled) {
   });
 }
 
+// Stable faculty identity for local/staging end-to-end tests. Unlike the
+// shared demo identity above, this account has its own credentials and owns
+// explicit timetable entries so the faculty schedule flow is never empty.
+const facultyDemoId = "tch-e2e-demo";
+if (!seedData.teachers.some((teacher) => teacher.id === facultyDemoId)) {
+  seedData.teachers.push({
+    id: facultyDemoId,
+    code: "DEMO",
+    name: "E2E Faculty",
+    department: "Computer Science",
+    email: "faculty-demo@example.edu",
+    password: bcrypt.hashSync("faculty-demo-2026", 10),
+    passwordVersion: 0,
+    role: "teacher",
+    phone: "",
+    cabin: "Faculty Block Demo",
+    subjects: ["Data Structures", "Operating Systems"]
+  });
+}
+if (!seedData.schedules.some((schedule) => schedule.id === "sch-e2e-demo-monday-1")) {
+  seedData.schedules.push(
+    {
+      id: "sch-e2e-demo-monday-1",
+      day: "Monday",
+      section: "CSE 3A",
+      room: "S302",
+      period: 1,
+      startTime: "09:30",
+      endTime: "10:20",
+      subject: "Data Structures",
+      teacher: "DEMO",
+      activity: "Lecture",
+      notes: "Seeded faculty demo class"
+    },
+    {
+      id: "sch-e2e-demo-wednesday-2",
+      day: "Wednesday",
+      section: "CSE 3A",
+      room: "S302",
+      period: 2,
+      startTime: "10:20",
+      endTime: "11:10",
+      subject: "Operating Systems",
+      teacher: "DEMO",
+      activity: "Lecture",
+      notes: "Seeded faculty demo class"
+    }
+  );
+}
+
 // Give one student per showcased section a fuller attendance history so
 // the attendance/reports views have something realistic to display.
 const highAttendanceStudent = seedData.students.find((student) => student.id === "stu-006");

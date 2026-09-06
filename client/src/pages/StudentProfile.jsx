@@ -1,5 +1,6 @@
 import React from "react";
 import { Mail, Phone, UserRound } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 
 export function StudentProfile() {
@@ -35,6 +36,7 @@ export function StudentProfile() {
                 <strong>{value}</strong>
               </div>
             ))}
+            <p className="helper-text">Approval status is managed by the administration and cannot be edited by students. Need an update? <Link to="/complaints">Contact the administration through Complaints.</Link></p>
           </div>
         </article>
         <article className="panel">

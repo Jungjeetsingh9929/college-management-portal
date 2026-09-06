@@ -22,6 +22,8 @@ export function Complaints() {
   const [form, setForm] = useState(blankComplaint);
   const [statusFilter, setStatusFilter] = useState("");
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState("");
+  const [openComplaintId, setOpenComplaintId] = useState("");
 
   async function loadComplaints() {
     const data = await apiFetch("/complaints");
@@ -49,13 +51,24 @@ export function Complaints() {
   async function submitComplaint(event) {
     event.preventDefault();
     setMessage("");
+    setMessageType("");
     try {
       const data = await apiFetch("/complaints", { method: "POST", body: JSON.stringify(form) });
-      setMessage(data.message);
+      setMessage(data.message || "Complaint submitted successfully.");
+      setMessageType("success");
       setForm(blankComplaint);
-      loadComplaints();
+      setComplaints((current) => [data.complaint, ...current.filter((item) => item.id !== data.complaint.id)]);
+      setOpenComplaintId(data.complaint.id);
+      // Keep the just-created record visible even if a subsequent refresh is
+      // interrupted by a transient network failure.
+      try {
+        await loadComplaints();
+      } catch {
+        // The POST succeeded and the local list already contains the record.
+      }
     } catch (error) {
       setMessage(error.message);
+      setMessageType("error");
     }
   }
 
@@ -113,7 +126,7 @@ export function Complaints() {
               Submit complaint
             </button>
           </form>
-          {message && <div className={message.includes("required") ? "error-box" : "success-box"}>{message}</div>}
+          {message && <div role="status" className={messageType === "error" ? "error-box" : "success-box"}>{message}</div>}
         </section>
       )}
 
@@ -151,6 +164,21 @@ export function Complaints() {
                 </div>
                 <p>{complaint.description}</p>
                 {complaint.response && <div className="response-box">{complaint.response}</div>}
+                <button
+                  className="secondary-button small"
+                  type="button"
+                  onClick={() => setOpenComplaintId((current) => current === complaint.id ? "" : complaint.id)}
+                  aria-expanded={openComplaintId === complaint.id}
+                >
+                  {openComplaintId === complaint.id ? "Hide tracking details" : "View tracking details"}
+                </button>
+                {openComplaintId === complaint.id && (
+                  <div className="response-box" role="region" aria-label={`Tracking details for ${complaint.title}`}>
+                    <strong>Status: {complaint.status}</strong>
+                    <span>Submitted {new Date(complaint.createdAt).toLocaleString()}</span>
+                    <span>{complaint.response ? "Latest admin response is shown above." : "The administration has not added a response yet."}</span>
+                  </div>
+                )}
                 {user.role === "admin" && (
                   <div className="admin-complaint-controls">
                     <select value={complaint.status} onChange={(e) => updateComplaint(complaint.id, { status: e.target.value })}>
