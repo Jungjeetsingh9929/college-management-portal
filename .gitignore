@@ -1,7 +1,9 @@
 node_modules/
 dist/
 .env
+*.env
 server/db/database.json
+storage/
 .DS_Store
 *.log
 *.zip

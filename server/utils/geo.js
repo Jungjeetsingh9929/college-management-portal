@@ -5,7 +5,7 @@ function toRadians(deg) {
 }
 
 // Great-circle distance between two lat/lng points, in meters.
-export function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
+function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
   const dLat = toRadians(lat2 - lat1);
   const dLon = toRadians(lon2 - lon1);
   const a =

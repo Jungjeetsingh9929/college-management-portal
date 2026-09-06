@@ -8,7 +8,9 @@ const blankSubject = {
   teacher: "",
   className: "CSE 3A",
   schedule: "",
-  room: ""
+  room: "",
+  department: "",
+  semester: ""
 };
 
 const blankClass = {
@@ -26,7 +28,9 @@ const subjectLabels = {
   teacher: "Professor Name",
   className: "Class / Section",
   schedule: "Schedule Text",
-  room: "Room No."
+  room: "Room No.",
+  department: "Department",
+  semester: "Semester"
 };
 
 const classLabels = {
@@ -83,7 +87,9 @@ export function SubjectManagement() {
       teacher: subject.teacher,
       className: subject.className,
       schedule: subject.schedule || "",
-      room: subject.room || ""
+      room: subject.room || "",
+      department: subject.department || "",
+      semester: subject.semester || ""
     });
   }
 

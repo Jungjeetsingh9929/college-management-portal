@@ -10,6 +10,9 @@ export function StudentProfile() {
   const [reason, setReason] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [phone, setPhone] = useState(user.phone || "");
+  const [guardian, setGuardian] = useState(user.guardian || "");
+  const [saving, setSaving] = useState(false);
   const details = [
     ["Roll number", user.rollNumber],
     ["Class", user.className],
@@ -80,9 +83,19 @@ export function StudentProfile() {
           </div>
         </article>
         <article className="panel">
-          <h2>Contact</h2>
+          <h2>Contact & permitted edits</h2>
           <div className="contact-row"><Mail size={18} /> {user.email}</div>
-          <div className="contact-row"><Phone size={18} /> {user.phone || "-"}</div>
+          <form className="form-stack" onSubmit={async (event) => {
+            event.preventDefault(); setSaving(true); setMessage(""); setError("");
+            try { await apiFetch("/students/me/profile", { method: "PUT", body: JSON.stringify({ phone, guardian }) }); setMessage("Profile details updated."); }
+            catch (err) { setError(err.message); } finally { setSaving(false); }
+          }}>
+            <label>Phone<input value={phone} onChange={(event) => setPhone(event.target.value)} maxLength={120} placeholder="Add a phone number" /></label>
+            <label>Guardian<input value={guardian} onChange={(event) => setGuardian(event.target.value)} maxLength={120} placeholder="Guardian name" /></label>
+            <button className="primary-button" type="submit" disabled={saving}>{saving ? "Saving..." : "Save contact details"}</button>
+            {message && <div className="success-box">{message}</div>}
+            {error && <div className="error-box">{error}</div>}
+          </form>
         </article>
       </section>
       <section className="panel">

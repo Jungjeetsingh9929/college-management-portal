@@ -26,7 +26,7 @@ The project focuses on common college operations such as role-based access, stud
 | Backend | Node.js, Express.js |
 | Auth | JWT, bcryptjs |
 | Reports | PDFKit, CSV export |
-| Storage | Local JSON storage for demo setup |
+| Storage | PostgreSQL when `DATABASE_URL` is set; local JSON fallback for development |
 | Testing | Node.js API smoke tests |
 
 ## Project Structure
@@ -113,14 +113,15 @@ The project includes a production start script and can be deployed on a Node.js 
 
 For production use, configure secrets and runtime values through the hosting dashboard. Do not commit real environment values, student records, attendance data, contact data, device keys, or generated database files.
 
-The server now rejects weak JWT secrets, limits login and quiz-answer attempts,
-scopes teacher attendance to their scheduled classes, uses atomic serialized
-JSON writes, and defuses spreadsheet formulas in CSV exports. If secrets were
+The server now rejects weak JWT secrets, requires `DATABASE_URL` in production,
+limits login and quiz-answer attempts, scopes teacher attendance to their
+scheduled classes, uses parameterized PostgreSQL state queries in production,
+and defuses spreadsheet formulas in CSV exports. If secrets were
 ever committed to a public repository, rotate them and scrub the repository
 history separately; deleting the files in a new commit is not enough.
 
 ## Portfolio Notes
 
-This repository uses synthetic demo data and local JSON storage to keep setup simple. A production version should use a real database, stronger validation, audit logging, rate limiting, secure file storage, and proper privacy controls for any sensitive data.
+When `DATABASE_URL` is set, the server stores its application state in a PostgreSQL table and automatically initializes the table on first start. Local JSON storage remains available only for development and tests; production startup fails if `DATABASE_URL` is missing. Render should provide `DATABASE_URL`, `JWT_SECRET`, `FRONTEND_URL`/`CLIENT_ORIGIN`, token settings, and upload-storage settings through its environment configuration. Uploaded files use isolated runtime storage; durable production retention requires object storage or a persistent disk.
 
 This project is best viewed as a full-stack learning and portfolio project, not a production-ready college system.

@@ -1,16 +1,125 @@
 import { Router } from "express";
+import crypto from "node:crypto";
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import multer from "multer";
 import { makeId, readDb, writeDb } from "../db/fileStore.js";
 import { requireAuth } from "../middleware/auth.js";
 import { clientKey, rateConfig, rateLimit } from "../middleware/rateLimit.js";
+import { calculateStudentStats, enrichAttendance, publicStudent, subjectStats, today } from "../services/attendanceService.js";
 import { parseAnswerIndex, requiredText } from "../services/validation.js";
 import { getCollegeGeofence, isWithinCollege } from "../utils/geo.js";
+import { classesTaughtByTeacher, scheduleBelongsToTeacher } from "../services/accessService.js";
 
 export const sharedRouter = Router();
+const uploadRoot = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), "storage", "submissions"));
+const submissionUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: Number(process.env.SUBMISSION_MAX_BYTES) || 5 * 1024 * 1024 },
+  fileFilter: (_req, file, callback) => { const extensions = { "application/pdf": ".pdf", "image/png": ".png", "image/jpeg": ".jpg" }; const name = path.extname(file.originalname || "").toLowerCase(); callback(null, extensions[file.mimetype] === name || (file.mimetype === "image/jpeg" && name === ".jpeg")); }
+});
+
+function hasMagicBytes(file) {
+  const header = file.buffer.subarray(0, 8);
+  return (file.mimetype === "application/pdf" && header.toString("ascii", 0, 5) === "%PDF-") ||
+    (file.mimetype === "image/png" && header.equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) ||
+    (file.mimetype === "image/jpeg" && header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff);
+}
+
+function publicAssignment(db, assignment, studentId) {
+  const completion = (db.assignmentCompletions || []).find((item) => item.assignmentId === assignment.id && item.studentId === studentId);
+  return { ...assignment, completed: Boolean(completion), submissionText: completion?.submissionText || "", submissionLink: completion?.submissionLink || "", submissionFile: completion?.submissionFile || null, status: computeAssignmentStatus(assignment.dueDate, Boolean(completion)) };
+}
+
+function buildNotifications(db, user) {
+  const notifications = [];
+  const push = (id, category, title, body, createdAt, href = "") => notifications.push({ id, category, title, body, createdAt: createdAt || new Date().toISOString(), href });
+  const student = user.role === "student" ? (db.students || []).find((item) => item.id === user.id) : null;
+  (db.notices || []).filter((item) => user.role === "admin" || (user.role === "teacher" && item.teacherId === user.id) || (student && (!item.className || item.className === student.className))).slice(0, 12).forEach((item) => push(`notice:${item.id}`, item.category === "emergency" ? "security" : "notice", item.title, item.body || "New notice published.", item.createdAt, "/complaints"));
+  if (student) {
+    (db.assignments || []).filter((item) => item.className === student.className && !((db.assignmentCompletions || []).some((completion) => completion.assignmentId === item.id && completion.studentId === student.id))).slice(0, 8).forEach((item) => push(`assignment:${item.id}`, "assignment", `Assignment deadline: ${item.title}`, `Due ${item.dueDate}.`, item.createdAt, "/assignments"));
+    const stats = calculateStudentStats(student.id, db.attendance || []); if (stats.total && stats.percentage < 75) push(`attendance:${student.id}`, "attendance", "Attendance warning", `Your attendance is ${stats.percentage}%.`, new Date().toISOString(), "/history");
+    (db.examinations || []).filter((item) => !item.className || item.className === student.className).slice(0, 6).forEach((item) => push(`exam:${item.id}`, "exam", `Exam announcement: ${item.subject}`, `${item.date || "Date to be announced"}${item.room ? ` · Room ${item.room}` : ""}.`, item.createdAt || item.date, "/student"));
+    (db.results || []).filter((item) => item.studentId === student.id).slice(0, 6).forEach((item) => push(`result:${item.id}`, "result", "Result published", item.subject || "Your academic result is available.", item.publishedAt, "/student"));
+  }
+  if (user.role === "teacher") (db.assignments || []).filter((item) => item.teacherId === user.id).slice(0, 8).forEach((item) => push(`faculty-assignment:${item.id}`, "assignment", `Assignment: ${item.title}`, `Class ${item.className} · due ${item.dueDate}.`, item.createdAt, "/faculty/assignments"));
+  if (user.role === "admin") { const pending = (db.pendingStudents || []).filter((item) => item.approvalStatus === "pending").length; if (pending) push("security:pending", "security", "Pending student approvals", `${pending} registration request${pending > 1 ? "s" : ""} require review.`, new Date().toISOString(), "/admin"); const inactive = (db.students || []).filter((item) => item.active === false).length; if (inactive) push("security:inactive", "security", "Inactive accounts", `${inactive} student account${inactive > 1 ? "s are" : " is"} inactive.`, new Date().toISOString(), "/admin"); }
+  return notifications.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+function buildSearchIndex(db, user) {
+  const results = [];
+  const add = (type, id, title, subtitle, href, value = "") => results.push({ type, id, title, subtitle, href, searchText: `${title} ${subtitle} ${value}`.toLowerCase() });
+  if (user.role === "admin") {
+    (db.students || []).forEach((item) => add("student", item.id, item.name, `${item.rollNumber} · ${item.className}`, "/admin", item.email));
+    (db.teachers || []).forEach((item) => add("faculty", item.id, item.name, `${item.code} · ${item.department}`, "/teachers", item.email));
+    (db.departments || []).forEach((item) => add("department", item.id, item.name, "Department", "/admin/resources"));
+    (db.subjects || []).forEach((item) => add("subject", item.id, item.subjectName, `${item.code} · ${item.className}`, "/subjects"));
+    (db.classrooms || []).forEach((item) => add("classroom", item.id, item.name, `${item.building} · capacity ${item.capacity}`, "/admin/resources"));
+    (db.schedules || []).forEach((item) => add("timetable", item.id, item.subject, `${item.day} · ${item.startTime}-${item.endTime} · ${item.section}`, "/central-timetable", `${item.teacher} ${item.room}`));
+  } else if (user.role === "teacher") {
+    const classes = classesTaughtByTeacher(db, user.code); (db.students || []).filter((item) => classes.includes(item.className)).forEach((item) => add("student", item.id, item.name, `${item.rollNumber} · ${item.className}`, "/faculty", item.email));
+    (db.subjects || []).filter((item) => classes.includes(item.className)).forEach((item) => add("subject", item.id, item.subjectName, `${item.code} · ${item.className}`, "/schedule"));
+    (db.schedules || []).filter((item) => scheduleBelongsToTeacher(item, user.code)).forEach((item) => add("class", item.id, item.subject, `${item.day} · ${item.startTime}-${item.endTime} · ${item.section}`, "/schedule", item.room));
+    (db.assignments || []).filter((item) => item.teacherId === user.id).forEach((item) => add("assignment", item.id, item.title, `${item.className} · due ${item.dueDate}`, "/faculty/assignments", item.description));
+  } else {
+    const student = (db.students || []).find((item) => item.id === user.id); const className = student?.className;
+    (db.subjects || []).filter((item) => item.className === className).forEach((item) => add("subject", item.id, item.subjectName, `${item.code} · ${item.teacher}`, "/schedule"));
+    (db.teachers || []).forEach((item) => add("faculty", item.id, item.name, item.department, "/teachers", item.email));
+    (db.notices || []).filter((item) => !item.className || item.className === className).forEach((item) => add("notice", item.id, item.title, item.category || "Notice", "/student", item.body));
+    (db.assignments || []).filter((item) => item.className === className).forEach((item) => add("assignment", item.id, item.title, `Due ${item.dueDate}`, "/assignments", item.description));
+    (db.examinations || []).filter((item) => !item.className || item.className === className).forEach((item) => add("exam", item.id, item.subject, `${item.date || "Date TBA"} · ${item.room || "Room TBA"}`, "/student"));
+  }
+  return results;
+}
 
 // 1. Get year schedule (holidays) - open to any authenticated user
 sharedRouter.get("/holidays", requireAuth, async (req, res) => {
   const db = await readDb();
   res.json({ holidays: db.holidays || [] });
+});
+
+sharedRouter.get("/search", requireAuth, async (req, res) => {
+  const query = String(req.query.q || "").trim().slice(0, 100); const db = await readDb(); const index = buildSearchIndex(db, req.user);
+  if (!query) return res.json({ query: "", suggestions: index.slice(0, 8).map(({ searchText, ...item }) => item), results: [], total: 0 });
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean); const results = index.filter((item) => terms.every((term) => item.searchText.includes(term))).slice(0, 30).map(({ searchText, ...item }) => item);
+  res.json({ query, suggestions: results.slice(0, 8), results, total: results.length });
+});
+
+sharedRouter.get("/notifications", requireAuth, async (req, res) => {
+  const db = await readDb(); db.notificationReads ||= {};
+  const notifications = buildNotifications(db, req.user); const readIds = new Set(db.notificationReads[req.user.id] || []);
+  res.json({ notifications: notifications.map((item) => ({ ...item, read: readIds.has(item.id) })), unreadCount: notifications.filter((item) => !readIds.has(item.id)).length });
+});
+
+sharedRouter.post("/notifications/:id/read", requireAuth, async (req, res) => {
+  const db = await readDb(); db.notificationReads ||= {}; const current = new Set(db.notificationReads[req.user.id] || []); current.add(String(req.params.id)); db.notificationReads[req.user.id] = [...current].slice(-500); await writeDb(db); res.json({ ok: true });
+});
+
+sharedRouter.post("/notifications/read-all", requireAuth, async (req, res) => {
+  const db = await readDb(); db.notificationReads ||= {}; db.notificationReads[req.user.id] = buildNotifications(db, req.user).map((item) => item.id).slice(-500); await writeDb(db); res.json({ ok: true });
+});
+
+sharedRouter.get("/student/portal", requireAuth, async (req, res) => {
+  if (req.user.role !== "student") return res.status(403).json({ message: "Student access required." });
+  const db = await readDb();
+  const student = (db.students || []).find((item) => item.id === req.user.id);
+  if (!student) return res.status(404).json({ message: "Student not found." });
+  const attendance = db.attendance || [];
+  const assignments = (db.assignments || []).filter((item) => item.className === student.className).map((item) => publicAssignment(db, item, student.id));
+  const schedule = (db.schedules || []).filter((item) => item.section === student.className).sort((a, b) => a.day.localeCompare(b.day) || a.period - b.period);
+  const stats = calculateStudentStats(student.id, attendance);
+  res.json({
+    student: publicStudent(student, attendance),
+    schedule,
+    attendance: { stats, subjects: subjectStats(student.id, db.subjects || [], attendance), today: enrichAttendance(attendance.filter((item) => item.studentId === student.id && item.date === today()), db) },
+    assignments,
+    examinations: (db.examinations || []).filter((item) => !item.className || item.className === student.className),
+    notices: (db.notices || []).filter((item) => !item.className || item.className === student.className).slice(0, 12),
+    fees: (db.fees || []).find((item) => item.studentId === student.id) || { status: "not-published", amountDue: 0, dueDate: null },
+    academics: student.academics || { sgpa: null, cgpa: null, subjects: [] },
+    holidays: (db.holidays || []).slice(0, 8)
+  });
 });
 
 // Compute an urgency status for an assignment relative to today, factoring in completion.
@@ -119,6 +228,34 @@ sharedRouter.post("/student/assignments/:id/complete", requireAuth, completeRate
   await writeDb(db);
 
   res.json({ completed: true });
+});
+
+sharedRouter.post("/student/assignments/:id/submission", requireAuth, completeRateLimit, (req, res, next) => {
+  submissionUpload.single("file")(req, res, (error) => {
+    if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") return res.status(413).json({ message: "Submission file is too large." });
+    if (error || !req.file) return res.status(400).json({ message: "Submit one PDF, PNG, or JPEG file." });
+    next();
+  });
+}, async (req, res) => {
+  if (req.user.role !== "student") return res.status(403).json({ message: "Student access required." });
+  if (!hasMagicBytes(req.file)) return res.status(400).json({ message: "The uploaded file content does not match its declared type." });
+  const db = await readDb();
+  db.assignments ||= [];
+  db.assignmentCompletions ||= [];
+  const student = db.students.find((item) => item.id === req.user.id);
+  const assignment = db.assignments.find((item) => item.id === req.params.id && item.className === student?.className);
+  if (!student || !assignment) return res.status(404).json({ message: "Assignment not found." });
+  await fs.mkdir(uploadRoot, { recursive: true, mode: 0o700 });
+  const extension = req.file.mimetype === "application/pdf" ? "pdf" : req.file.mimetype === "image/png" ? "png" : "jpg";
+  const storedName = `${crypto.randomUUID()}.${extension}`;
+  await fs.writeFile(path.join(uploadRoot, storedName), req.file.buffer, { mode: 0o600 });
+  const existing = db.assignmentCompletions.find((item) => item.assignmentId === assignment.id && item.studentId === student.id);
+  const completion = existing || { id: makeId("cmp"), assignmentId: assignment.id, studentId: student.id };
+  completion.completedAt = new Date().toISOString();
+  completion.submissionFile = { name: req.file.originalname.slice(0, 120), type: req.file.mimetype, size: req.file.size, storedName };
+  if (!existing) db.assignmentCompletions.push(completion);
+  await writeDb(db);
+  res.json({ completed: true, submissionFile: completion.submissionFile });
 });
 
 sharedRouter.delete("/student/assignments/:id/complete", requireAuth, completeRateLimit, async (req, res) => {

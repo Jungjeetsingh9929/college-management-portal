@@ -9,7 +9,7 @@ export const teachersRouter = Router();
 teachersRouter.get("/", requireAuth, requireStaff, async (_req, res) => {
   const db = await readDb();
   db.teachers ||= [];
-  res.json({ teachers: db.teachers.map(({ password, ...teacher }) => teacher) });
+  res.json({ teachers: db.teachers.map(({ password, ...teacher }) => ({ ...teacher, workload: (db.schedules || []).filter((item) => String(item.teacher || "").toLowerCase().includes(String(teacher.code || "").toLowerCase())).length })) });
 });
 
 teachersRouter.post("/", requireAuth, requireAdmin, async (req, res) => {

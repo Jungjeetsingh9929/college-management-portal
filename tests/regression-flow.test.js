@@ -1,10 +1,10 @@
 process.env.NODE_ENV = "test";
 process.env.JWT_SECRET = "test-attendance-secret-32-chars-long";
 process.env.SEED_ADMIN_EMAIL = "admin@example.edu";
-process.env.SEED_ADMIN_PASSWORD = "test-admin-password";
-process.env.SEED_STUDENT_PASSWORD = "test-student-password";
-process.env.E2E_FACULTY_PASSWORD = "test-e2e-faculty-password";
-process.env.E2E_ADMIN_PASSWORD = "test-e2e-admin-password";
+process.env.SEED_ADMIN_PASSWORD = "Test-admin-password1!";
+process.env.SEED_STUDENT_PASSWORD = "Test-student-password1!";
+process.env.E2E_FACULTY_PASSWORD = "Test-e2e-faculty1!";
+process.env.E2E_ADMIN_PASSWORD = "Test-e2e-admin1!";
 
 import assert from "node:assert/strict";
 const { resetDb } = await import("../server/db/fileStore.js");
@@ -20,9 +20,9 @@ async function call(path, options = {}) {
   return data;
 }
 try {
-  const admin = await call("/auth/login", { method: "POST", body: JSON.stringify({ email: "admin@example.edu", password: "test-admin-password", role: "admin" }) });
+  const admin = await call("/auth/login", { method: "POST", body: JSON.stringify({ email: "admin@example.edu", password: "Test-admin-password1!", role: "admin" }) });
   const e2eAdmin = await call("/auth/login", { method: "POST", body: JSON.stringify({ email: "admin-demo@example.edu", password: process.env.E2E_ADMIN_PASSWORD, role: "admin" }) });
-  const student = await call("/auth/login", { method: "POST", body: JSON.stringify({ email: "student001@example.edu", password: "test-student-password", role: "student" }) });
+  const student = await call("/auth/login", { method: "POST", body: JSON.stringify({ email: "student001@example.edu", password: "Test-student-password1!", role: "student" }) });
   const faculty = await call("/auth/login", { method: "POST", body: JSON.stringify({ email: "faculty-demo@example.edu", password: process.env.E2E_FACULTY_PASSWORD, role: "teacher" }) });
   const studentHeaders = { Authorization: `Bearer ${student.token}` };
   const adminHeaders = { Authorization: `Bearer ${admin.token}` };
@@ -55,11 +55,11 @@ try {
   const createdSchedule = await call("/schedules", {
     method: "POST",
     headers: adminHeaders,
-    body: JSON.stringify({ day: "Tuesday", section: "CSE 3A", room: "S304", period: 2, startTime: "10:20", endTime: "11:10", subject: "TestSubject42", teacher: "DEMO" })
+    body: JSON.stringify({ day: "Tuesday", section: "CSE 3A", room: "S304", period: 9, startTime: "17:00", endTime: "17:50", subject: "TestSubject42", teacher: "DEMO" })
   });
   const scheduleAfterCreate = await call("/schedules", { headers: adminHeaders });
   assert.equal(scheduleAfterCreate.schedules.find((item) => item.id === createdSchedule.schedule.id).subject, "TestSubject42");
-  await call(`/schedules/${createdSchedule.schedule.id}`, { method: "PUT", headers: adminHeaders, body: JSON.stringify({ day: "Wednesday", room: "S305", period: 3, startTime: "11:10", endTime: "12:00", subject: "TestSubject42", teacher: "DEMO" }) });
+  await call(`/schedules/${createdSchedule.schedule.id}`, { method: "PUT", headers: adminHeaders, body: JSON.stringify({ day: "Wednesday", room: "S305", period: 9, startTime: "17:00", endTime: "17:50", subject: "TestSubject42", teacher: "DEMO" }) });
   const scheduleAfterEdit = await call("/schedules", { headers: adminHeaders });
   const editedSchedule = scheduleAfterEdit.schedules.find((item) => item.id === createdSchedule.schedule.id);
   assert.equal(editedSchedule.day, "Wednesday");

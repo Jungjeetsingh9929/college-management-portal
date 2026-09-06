@@ -12,7 +12,7 @@ subjectsRouter.get("/", requireAuth, async (_req, res) => {
 
 subjectsRouter.post("/", requireAuth, requireAdmin, async (req, res) => {
   const db = await readDb();
-  try { validateKeys(req.body || {}, ["subjectName", "code", "teacher", "className", "schedule", "room"]); } catch { return res.status(400).json({ message: "Invalid subject data." }); }
+  try { validateKeys(req.body || {}, ["subjectName", "code", "teacher", "className", "schedule", "room", "department", "semester"]); } catch { return res.status(400).json({ message: "Invalid subject data." }); }
   let subjectName, code, teacher, className;
   try {
     subjectName = requiredText(req.body.subjectName, "Subject name", { max: 120 });
@@ -24,7 +24,9 @@ subjectsRouter.post("/", requireAuth, requireAdmin, async (req, res) => {
     id: makeId("sub"),
     subjectName, code, teacher, className,
     schedule: req.body.schedule || "",
-    room: req.body.room || ""
+    room: req.body.room || "",
+    department: req.body.department ? requiredText(req.body.department, "Department", { max: 120 }) : "",
+    semester: req.body.semester ? requiredText(req.body.semester, "Semester", { max: 40 }) : ""
   };
   db.subjects.push(subject);
   await writeDb(db);
@@ -33,13 +35,13 @@ subjectsRouter.post("/", requireAuth, requireAdmin, async (req, res) => {
 
 subjectsRouter.put("/:id", requireAuth, requireAdmin, async (req, res) => {
   const db = await readDb();
-  try { validateKeys(req.body || {}, ["subjectName", "code", "teacher", "className", "schedule", "room"]); } catch { return res.status(400).json({ message: "Invalid subject data." }); }
+  try { validateKeys(req.body || {}, ["subjectName", "code", "teacher", "className", "schedule", "room", "department", "semester"]); } catch { return res.status(400).json({ message: "Invalid subject data." }); }
   const subject = db.subjects.find((item) => item.id === req.params.id);
   if (!subject) return res.status(404).json({ message: "Subject not found." });
-  for (const [field, max] of [["subjectName", 120], ["code", 30], ["teacher", 120], ["className", 80], ["schedule", 120], ["room", 40]]) {
+  for (const [field, max] of [["subjectName", 120], ["code", 30], ["teacher", 120], ["className", 80], ["schedule", 120], ["room", 40], ["department", 120], ["semester", 40]]) {
     if (req.body[field] !== undefined) { try { requiredText(req.body[field], field, { min: 0, max }); } catch { return res.status(400).json({ message: "Invalid subject data." }); } }
   }
-  ["subjectName", "code", "teacher", "className", "schedule", "room"].forEach((field) => {
+  ["subjectName", "code", "teacher", "className", "schedule", "room", "department", "semester"].forEach((field) => {
     if (req.body[field] !== undefined) subject[field] = req.body[field];
   });
   await writeDb(db);

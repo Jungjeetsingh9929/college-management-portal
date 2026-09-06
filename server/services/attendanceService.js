@@ -5,8 +5,13 @@ export const today = () => format(new Date(), "yyyy-MM-dd");
 
 export function publicStudent(student, attendance = []) {
   const stats = calculateStudentStats(student.id, attendance);
-  const { password, ...safeStudent } = student;
+  const { password, passwordHistory, passwordVersion, ...safeStudent } = student;
   return { ...safeStudent, attendancePercentage: stats.percentage };
+}
+
+export function facultyStudent(student, attendance = []) {
+  const stats = calculateStudentStats(student.id, attendance);
+  return { id: student.id, name: student.name, rollNumber: student.rollNumber, className: student.className, department: student.department, graduationYear: student.graduationYear, attendancePercentage: stats.percentage };
 }
 
 export function calculateStudentStats(studentId, attendance) {

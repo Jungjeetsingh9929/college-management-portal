@@ -16,8 +16,10 @@ function seedSecret(name, fallback) {
 
 const demoAdminPassword = seedSecret("SEED_ADMIN_PASSWORD", "");
 const demoStudentPassword = seedSecret("SEED_STUDENT_PASSWORD", "");
-const e2eFacultyPassword = seedSecret("E2E_FACULTY_PASSWORD", "");
-const e2eAdminPassword = seedSecret("E2E_ADMIN_PASSWORD", "");
+// E2E-only accounts must never block a normal production server startup.
+const e2eEnabled = process.env.NODE_ENV !== "production" || process.env.RUN_E2E_SEED === "true";
+const e2eFacultyPassword = e2eEnabled ? seedSecret("E2E_FACULTY_PASSWORD", "") : randomBytes(32).toString("hex");
+const e2eAdminPassword = e2eEnabled ? seedSecret("E2E_ADMIN_PASSWORD", "") : randomBytes(32).toString("hex");
 // Note: teacher accounts do NOT use a single shared SEED_TEACHER_PASSWORD.
 // Each teacher gets its own predictable demo password ("<CODE>@Uem2026"),
 // or a real one via FACULTY_<CODE>_EMAIL/FACULTY_<CODE>_PASSWORD — see the
@@ -697,11 +699,12 @@ seedData.teachers = teacherCodes.map((code) => {
   if (
     process.env.NODE_ENV === "production" &&
     !overridePassword &&
-    process.env.ALLOW_DEMO_TEACHER_PASSWORDS !== "true"
+    process.env.ALLOW_DEMO_TEACHER_PASSWORDS !== "true" &&
+    process.env.SEED_FACULTY_PASSWORD === undefined
   ) {
     throw new Error(
-      `FACULTY_${code}_PASSWORD must be set in production (guessable demo password otherwise). ` +
-        `Set it, or set ALLOW_DEMO_TEACHER_PASSWORDS=true to explicitly allow the public demo password for teachers you haven't migrated yet.`
+        `FACULTY_${code}_PASSWORD or SEED_FACULTY_PASSWORD must be set in production. ` +
+        `Use individual FACULTY_<CODE>_PASSWORD values for real accounts; SEED_FACULTY_PASSWORD is only a temporary bootstrap option.`
     );
   }
   // Explicitly configured credentials use the full bcrypt cost; generated
@@ -713,7 +716,7 @@ seedData.teachers = teacherCodes.map((code) => {
     name,
     department,
     email: overrideEmail || `${code.toLowerCase()}@example.edu`,
-    password: bcrypt.hashSync(overridePassword || defaultPassword, hashCost),
+    password: bcrypt.hashSync(overridePassword || process.env.SEED_FACULTY_PASSWORD || defaultPassword, hashCost),
     passwordVersion: 0,
     role: "teacher",
     phone: "",

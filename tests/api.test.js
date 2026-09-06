@@ -1,12 +1,12 @@
 process.env.NODE_ENV = "test";
 process.env.JWT_SECRET = "test-attendance-secret-32-chars-long";
 process.env.SEED_ADMIN_EMAIL = "admin@example.edu";
-process.env.SEED_ADMIN_PASSWORD = "test-admin-password";
-process.env.SEED_STUDENT_PASSWORD = "test-student-password";
-process.env.E2E_FACULTY_PASSWORD = "test-e2e-faculty-password";
-process.env.E2E_ADMIN_PASSWORD = "test-e2e-admin-password";
-process.env.DEMO_LOGIN_PASSWORD = "test-demo-login-password";
-process.env.FACULTY_LRG_PASSWORD = "test-lrg-faculty-password";
+process.env.SEED_ADMIN_PASSWORD = "Test-admin-password1!";
+process.env.SEED_STUDENT_PASSWORD = "Test-student-password1!";
+process.env.E2E_FACULTY_PASSWORD = "Test-e2e-faculty1!";
+process.env.E2E_ADMIN_PASSWORD = "Test-e2e-admin1!";
+process.env.DEMO_LOGIN_PASSWORD = "Test-demo-login1!";
+process.env.FACULTY_LRG_PASSWORD = "Test-lrg-faculty1!";
 process.env.COLLEGE_LATITUDE = "27.2124649";
 process.env.COLLEGE_LONGITUDE = "75.7002425";
 process.env.COLLEGE_RADIUS_METERS = "300";
@@ -110,15 +110,15 @@ try {
       name: "Jungjeet Rathore",
       department: "Computer Science",
       email: "teacher-demo@example.edu",
-      password: "teacher-demo-password",
+      password: "Teacher-demo-password1!",
       subjects: []
     })
   });
   const newTeacherLogin = await json("/auth/login", {
-    method: "POST",
-    body: JSON.stringify({
+      method: "POST",
+      body: JSON.stringify({
       email: "teacher-demo@example.edu",
-      password: "teacher-demo-password",
+      password: "Teacher-demo-password1!",
       role: "teacher"
     })
   });
@@ -251,7 +251,7 @@ try {
   });
   assert.equal(weakPassword.response.status, 400);
 
-  const changedPassword = "student-rotated-password-2026";
+  const changedPassword = "Student-rotated-password-2026!";
   const passwordChange = await json("/auth/change-password", {
     method: "POST",
     headers: { Authorization: `Bearer ${student.token}` },

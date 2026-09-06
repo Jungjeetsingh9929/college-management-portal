@@ -10,10 +10,11 @@ const GROUP_META = [
   { key: "upcoming", label: "Upcoming" }
 ];
 
-function AssignmentRow({ assignment, onToggle, busy }) {
+function AssignmentRow({ assignment, onToggle, onUpload, busy }) {
   const [expanded, setExpanded] = useState(false);
   const [submissionText, setSubmissionText] = useState(assignment.submissionText || "");
   const [submissionLink, setSubmissionLink] = useState(assignment.submissionLink || "");
+  const [file, setFile] = useState(null);
 
   useEffect(() => {
     if (assignment.completed) setExpanded(true);
@@ -67,6 +68,10 @@ function AssignmentRow({ assignment, onToggle, busy }) {
               style={{ fontSize: "0.9rem" }}
             />
           </label>
+          <label style={{ fontSize: "0.85rem" }}>
+            Upload submission (PDF, PNG, or JPEG; max 5 MB)
+            <input type="file" accept="application/pdf,image/png,image/jpeg" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+          </label>
           <button 
             type="button" 
             className="secondary-button" 
@@ -76,6 +81,8 @@ function AssignmentRow({ assignment, onToggle, busy }) {
           >
             Save Submission
           </button>
+          {file && <button type="button" className="secondary-button" style={{ alignSelf: "flex-start" }} onClick={() => onUpload(assignment, file)} disabled={busy}>Upload file</button>}
+          {assignment.submissionFile && <span className="helper-text">Submitted file: {assignment.submissionFile.name}</span>}
         </div>
       )}
     </div>
@@ -122,6 +129,21 @@ export function StudentAssignments() {
     }
   }
 
+  async function handleUpload(assignment, file) {
+    setBusyId(assignment.id);
+    setError("");
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      await apiFetch(`/shared/student/assignments/${assignment.id}/submission`, { method: "POST", body });
+      await loadAssignments();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   if (loading) return <div className="panel">Loading assignments...</div>;
 
   const groups = groupAssignmentsByStatus(assignments);
@@ -155,6 +177,7 @@ export function StudentAssignments() {
                         key={assignment.id}
                         assignment={assignment}
                         onToggle={handleToggle}
+                        onUpload={handleUpload}
                         busy={busyId === assignment.id}
                       />
                     ))}
@@ -180,6 +203,7 @@ export function StudentAssignments() {
                         key={assignment.id}
                         assignment={assignment}
                         onToggle={handleToggle}
+                        onUpload={handleUpload}
                         busy={busyId === assignment.id}
                       />
                     ))}

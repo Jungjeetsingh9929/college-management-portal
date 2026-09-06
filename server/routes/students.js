@@ -31,7 +31,22 @@ studentsRouter.get("/", requireAuth, async (req, res) => {
   if (className) students = students.filter((student) => student.className === className);
   if (department) students = students.filter((student) => student.department === department);
 
-  res.json({ students: students.map((student) => publicStudent(student, db.attendance)) });
+  const total = students.length; const page = Math.max(1, Math.min(10000, Number.parseInt(req.query.page || "1", 10) || 1)); const perPage = Math.max(1, Math.min(100, Number.parseInt(req.query.perPage || "100", 10) || 100)); const paged = students.slice((page - 1) * perPage, page * perPage);
+  res.json({ students: paged.map((student) => publicStudent(student, db.attendance)), pagination: { page, perPage, total, pages: Math.ceil(total / perPage) } });
+});
+
+studentsRouter.put("/me/profile", requireAuth, async (req, res) => {
+  if (req.user.role !== "student") return res.status(403).json({ message: "Only students can update this profile." });
+  try { validateKeys(req.body || {}, ["phone", "guardian"]); } catch { return res.status(400).json({ message: "Invalid profile data." }); }
+  const db = await readDb();
+  const student = db.students.find((item) => item.id === req.user.id);
+  if (!student) return res.status(404).json({ message: "Student not found." });
+  for (const field of ["phone", "guardian"]) {
+    if (req.body[field] !== undefined && (typeof req.body[field] !== "string" || req.body[field].trim().length > 120)) return res.status(400).json({ message: "Profile field is invalid." });
+    if (req.body[field] !== undefined) student[field] = req.body[field].trim();
+  }
+  await writeDb(db);
+  res.json({ student: publicStudent(student, db.attendance) });
 });
 
 studentsRouter.post("/me/status-request", requireAuth, async (req, res) => {
@@ -162,6 +177,14 @@ studentsRouter.put("/:id", requireAuth, requireAdmin, async (req, res) => {
 
   await writeDb(db);
   res.json({ student: publicStudent(student, db.attendance) });
+});
+
+studentsRouter.patch("/:id/status", requireAuth, requireAdmin, async (req, res) => {
+  try { validateKeys(req.body || {}, ["active"]); } catch { return res.status(400).json({ message: "Invalid student status." }); }
+  if (typeof req.body.active !== "boolean") return res.status(400).json({ message: "active must be boolean." });
+  const db = await readDb(); const student = db.students.find((item) => item.id === req.params.id);
+  if (!student) return res.status(404).json({ message: "Student not found." });
+  student.active = req.body.active; await writeDb(db); res.json({ student: publicStudent(student, db.attendance) });
 });
 
 studentsRouter.delete("/:id", requireAuth, requireAdmin, async (req, res) => {

@@ -15,19 +15,23 @@ export function AuthProvider({ children }) {
     }
     apiFetch("/auth/me")
       .then((data) => setUser(data.user))
-      .catch(() => localStorage.removeItem("attendance_token"))
+      .catch(() => { localStorage.removeItem("attendance_token"); localStorage.removeItem("attendance_refresh_token"); })
       .finally(() => setLoading(false));
   }, []);
 
   async function login(credentials) {
     const data = await apiFetch("/auth/login", { method: "POST", body: JSON.stringify(credentials) });
     localStorage.setItem("attendance_token", data.token);
+    if (data.refreshToken) localStorage.setItem("attendance_refresh_token", data.refreshToken);
     setUser(data.user);
     return data.user;
   }
 
-  function logout() {
+  async function logout() {
+    const refreshToken = localStorage.getItem("attendance_refresh_token");
+    if (refreshToken) await fetch(`${import.meta.env.VITE_API_URL || "/api"}/auth/logout`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refreshToken }) }).catch(() => {});
     localStorage.removeItem("attendance_token");
+    localStorage.removeItem("attendance_refresh_token");
     setUser(null);
   }
 

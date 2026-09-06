@@ -2,6 +2,7 @@ import React from "react";
 import { KeyRound, Mail, UserRound } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { ChangePassword } from "../components/ChangePassword.jsx";
+import { SessionManagement } from "../components/SessionManagement.jsx";
 
 export function AccountSettings() {
   const { user } = useAuth();
@@ -26,6 +27,7 @@ export function AccountSettings() {
         </article>
         <ChangePassword />
       </section>
+      <SessionManagement />
     </div>
   );
 }

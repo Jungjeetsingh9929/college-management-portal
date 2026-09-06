@@ -7,26 +7,12 @@ export function requiredText(value, field, { min = 1, max = 160 } = {}) {
   return text;
 }
 
-export function optionalText(value, field, { max = 160 } = {}) {
-  if (value === undefined || value === null || value === "") return "";
-  return requiredText(value, field, { min: 0, max });
-}
-
-export function requestObject(body) {
-  if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("Request body must be an object.");
-  return body;
-}
-
 export function validEmail(value) {
   return typeof value === "string" && value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
 export function validId(value) {
   return typeof value === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(value);
-}
-
-export function validDate(value) {
-  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
 }
 
 export function validTime(value) {
@@ -39,10 +25,10 @@ export function enumValue(value, field, values) {
 }
 
 export function validPassword(value) {
-  return typeof value === "string" && value.length >= 12 && value.length <= 200;
+  return typeof value === "string" && value.length >= 12 && value.length <= 200 && /[a-z]/.test(value) && /[A-Z]/.test(value) && /\d/.test(value) && /[^A-Za-z0-9\s]/.test(value);
 }
 
-export const PASSWORD_REQUIREMENTS = "Password must be between 12 and 200 characters.";
+export const PASSWORD_REQUIREMENTS = "Password must be 12-200 characters and include upper-case, lower-case, numeric, and symbol characters.";
 
 export function parseAnswerIndex(value, optionCount) {
   const index = Number(value);

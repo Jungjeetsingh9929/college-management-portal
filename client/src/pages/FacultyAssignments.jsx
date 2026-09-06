@@ -110,6 +110,19 @@ export function FacultyAssignments() {
     }
   }
 
+  async function evaluateSubmission(assignmentId, submission) {
+    const marks = window.prompt(`Marks for ${submission.name} (0-100):`, submission.marks ?? "");
+    if (marks === null) return;
+    const feedback = window.prompt("Feedback (optional):", submission.feedback || "");
+    if (feedback === null) return;
+    try {
+      await apiFetch(`/faculty/assignments/${assignmentId}/submissions/${submission.id}`, { method: "PUT", body: JSON.stringify({ marks: Number(marks), maxMarks: 100, feedback }) });
+      const data = await apiFetch(`/faculty/assignments/${assignmentId}/submissions`);
+      setSubmissions(data.submissions);
+      setMessage("Submission evaluated.");
+    } catch (err) { setError(err.message); }
+  }
+
   if (loading) return <div>Loading...</div>;
 
   const overdueCount = assignments.filter(a => isOverdue(a.dueDate)).length;
@@ -196,6 +209,9 @@ export function FacultyAssignments() {
                                       Link: <a href={sub.submissionLink} target="_blank" rel="noreferrer" style={{ color: "var(--primary)" }}>{sub.submissionLink}</a>
                                     </p>
                                   )}
+                                  {sub.submissionFile && <p style={{ margin: "4px 0 0" }}>File submitted: {sub.submissionFile.name}</p>}
+                                  <button type="button" className="secondary-button" style={{ marginTop: "8px" }} onClick={() => evaluateSubmission(a.id, sub)}>{sub.evaluatedAt ? "Update evaluation" : "Evaluate submission"}</button>
+                                  {sub.evaluatedAt && <p style={{ margin: "4px 0 0" }}>Score: {sub.marks}/{sub.maxMarks}{sub.feedback ? ` · ${sub.feedback}` : ""}</p>}
                                 </div>
                               ) : (
                                 <div style={{ fontSize: "0.85rem", color: "var(--muted)", marginTop: "4px" }}>Not completed</div>

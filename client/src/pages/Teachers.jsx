@@ -177,6 +177,7 @@ export function Teachers() {
                 </div>
                 <div className="detail-list compact-details">
                   <div><span>Email</span><strong>{teacher.email || "-"}</strong></div>
+                  <div><span>Workload</span><strong>{teacher.workload ?? 0} scheduled classes</strong></div>
                   <div><span>Cabin</span><strong>{teacher.cabin || "-"}</strong></div>
                 </div>
                 <div className="subject-tags">

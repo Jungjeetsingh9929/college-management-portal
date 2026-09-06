@@ -3,7 +3,7 @@ services:
     name: college-management-portal
     env: node
     plan: free
-    buildCommand: npm install && npm run build
+    buildCommand: npm ci && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
@@ -13,18 +13,22 @@ services:
         value: 0.0.0.0
       - key: JWT_SECRET
         generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: BACKEND_URL
+        sync: false
       - key: CLIENT_ORIGIN
-        value: https://college-management-portal.onrender.com
+        sync: false
       - key: SEED_ADMIN_EMAIL
         sync: false
       - key: SEED_ADMIN_PASSWORD
         sync: false
       - key: SEED_STUDENT_PASSWORD
         sync: false
-      # Staging/portfolio mode only. Replace every FACULTY_<CODE>_PASSWORD
-      # with a unique secret before real college use, then remove this flag.
-      - key: ALLOW_DEMO_TEACHER_PASSWORDS
-        value: true
+      - key: SEED_FACULTY_PASSWORD
+        sync: false
       - key: LOW_ATTENDANCE_THRESHOLD
         value: 75
       # Geofenced attendance (optional): leave unset to disable the
@@ -35,3 +39,13 @@ services:
         sync: false
       - key: COLLEGE_RADIUS_METERS
         value: 200
+      - key: SUBMISSION_MAX_BYTES
+        value: 5242880
+      - key: UPLOAD_DIR
+        value: /tmp/college-management-submissions
+      - key: ACCESS_TOKEN_TTL
+        value: 15m
+      - key: REFRESH_TOKEN_DAYS
+        value: 30
+      - key: AUDIT_LOG_MAX_EVENTS
+        value: 10000

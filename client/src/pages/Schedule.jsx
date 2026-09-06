@@ -50,6 +50,7 @@ export function Schedule() {
   const [form, setForm] = useState(blankSchedule);
   const [editingId, setEditingId] = useState("");
   const [message, setMessage] = useState("");
+  const [studentView, setStudentView] = useState("weekly");
 
   async function loadSchedules() {
     if (user.role === "teacher") {
@@ -87,6 +88,7 @@ export function Schedule() {
   // to their own class.
   const activeSections = user.role === "student" ? [user.className] : sections;
   const selectedSection = user.role === "student" ? user.className : sectionFilter || sections[0] || "";
+  const todayName = ["Sunday", ...days][new Date().getDay()];
   const tableSchedules = schedules.filter((item) => item.section === selectedSection);
   const selectedAttendance = useMemo(() => {
     if (!selectedSchedule || !attendanceSummary) return null;
@@ -169,6 +171,7 @@ export function Schedule() {
           <p className="helper-text">No classes have been assigned to you yet. Once an admin adds you as the teacher on a schedule entry, it will show up here.</p>
         )}
         <div className="toolbar">
+          {user.role === "student" && <div className="segmented mini" aria-label="Timetable view"><button className={studentView === "today" ? "active" : ""} type="button" onClick={() => { setStudentView("today"); setDayFilter(todayName); }}>Today</button><button className={studentView === "weekly" ? "active" : ""} type="button" onClick={() => { setStudentView("weekly"); setDayFilter(""); }}>Weekly</button><button className={studentView === "full" ? "active" : ""} type="button" onClick={() => { setStudentView("full"); setDayFilter(""); }}>Full</button></div>}
           {(user.role === "admin" || user.role === "teacher") && sections.length > 0 && (
             <label>
               Section
@@ -191,7 +194,7 @@ export function Schedule() {
         <div className="section-heading">
           <div>
             <span className="eyebrow">Time table view</span>
-            <h2>{selectedSection || "Section"} weekly table</h2>
+        <h2>{selectedSection || "Section"} {user.role === "student" && studentView === "today" ? "today" : "weekly table"}</h2>
           </div>
           <Badge value="Lunch 12:00-1:00" />
         </div>
@@ -373,7 +376,7 @@ function ScheduleCell({ item, onSelect, selected }) {
       <button className="schedule-cell-button" type="button" onClick={() => onSelect?.(item)} disabled={!onSelect}>
         <strong>{item.subject}</strong>
         <span>{item.teacher}</span>
-        <small>{item.room}</small>
+        <small>{item.building || "Main Block"} · {item.room}</small>
         {item.notes && <small>{item.notes}</small>}
       </button>
     </td>

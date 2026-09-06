@@ -10,20 +10,25 @@ import { Home } from "./pages/Home.jsx";
 import { Login } from "./pages/Login.jsx";
 import { Reports } from "./pages/Reports.jsx";
 import { Schedule } from "./pages/Schedule.jsx";
+import { CentralTimetable } from "./pages/CentralTimetable.jsx";
 import { StudentAssignments } from "./pages/StudentAssignments.jsx";
 import { StudentDashboard } from "./pages/StudentDashboard.jsx";
 import { StudentProfile } from "./pages/StudentProfile.jsx";
 import { StudentRecords } from "./pages/StudentRecords.jsx";
 import { AccountSettings } from "./pages/AccountSettings.jsx";
 import { SubjectManagement } from "./pages/SubjectManagement.jsx";
+import { AdminResources } from "./pages/AdminResources.jsx";
+import { SecurityDashboard } from "./pages/SecurityDashboard.jsx";
 import { Teachers } from "./pages/Teachers.jsx";
 import { FacultyDashboard } from "./pages/FacultyDashboard.jsx";
 import { FacultyAssignments } from "./pages/FacultyAssignments.jsx";
+import { FacultyTools } from "./pages/FacultyTools.jsx";
 import { MarkAttendance } from "./pages/MarkAttendance.jsx";
 import { QuizGenerator } from "./pages/QuizGenerator.jsx";
 import { QuizAnswer } from "./pages/QuizAnswer.jsx";
 import { YearSchedule } from "./pages/YearSchedule.jsx";
 import { PwaInstallPrompt } from "./components/PwaInstallPrompt.jsx";
+import { ToastProvider } from "./components/UI.jsx";
 import "./styles.css";
 
 function ProtectedRoute({ children, role, roles }) {
@@ -137,11 +142,41 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/central-timetable"
+        element={
+          <ProtectedRoute role="admin">
+            <AppLayout>
+              <CentralTimetable />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/subjects"
         element={
           <ProtectedRoute role="admin">
             <AppLayout>
               <SubjectManagement />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/resources"
+        element={
+          <ProtectedRoute role="admin">
+            <AppLayout>
+              <AdminResources />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/security"
+        element={
+          <ProtectedRoute role="admin">
+            <AppLayout>
+              <SecurityDashboard />
             </AppLayout>
           </ProtectedRoute>
         }
@@ -207,6 +242,16 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/faculty/tools"
+        element={
+          <ProtectedRoute role="teacher">
+            <AppLayout>
+              <FacultyTools />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/student/quiz/:id"
         element={
           <ProtectedRoute role="student">
@@ -241,11 +286,13 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <AuthProvider>
-      <BrowserRouter>
-        <AppRoutes />
-        <PwaInstallPrompt />
-      </BrowserRouter>
-    </AuthProvider>
+    <ToastProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppRoutes />
+          <PwaInstallPrompt />
+        </BrowserRouter>
+      </AuthProvider>
+    </ToastProvider>
   </React.StrictMode>
 );
