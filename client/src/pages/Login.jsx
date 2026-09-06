@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { ScanLine } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 
 export function Login() {
@@ -23,7 +23,6 @@ export function Login() {
   const [message, setMessage] = useState("");
   const { login } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
 
   function switchRole(nextRole) {
     setRole(nextRole);
@@ -37,11 +36,7 @@ export function Login() {
     setMessage("");
     try {
       const user = await login({ email, password, role });
-      const requestedPath = new URLSearchParams(location.search).get("returnTo");
-      const returnTo = requestedPath && requestedPath.startsWith("/") && !requestedPath.startsWith("//")
-        ? requestedPath
-        : "";
-      navigate(returnTo || (user.role === "admin" ? "/admin" : user.role === "teacher" ? "/faculty" : "/student"));
+      navigate(user.role === "admin" ? "/admin" : user.role === "teacher" ? "/faculty" : "/student");
     } catch (err) {
       setError(err.message);
     }
