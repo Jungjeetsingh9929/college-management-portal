@@ -14,7 +14,6 @@ export function AppLayout({ children }) {
     { to: "/schedule", label: "Schedule", icon: CalendarDays },
     { to: "/teachers", label: "Teachers", icon: UsersRound },
     { to: "/complaints", label: "Complaints", icon: ClipboardList },
-    { to: "/student-records", label: "Student Records", icon: UsersRound },
     { to: "/history", label: "History", icon: History },
     { to: "/reports", label: "Reports", icon: BarChart3 },
     { to: "/year-schedule", label: "Year Schedule", icon: Calendar },
