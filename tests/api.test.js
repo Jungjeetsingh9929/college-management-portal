@@ -64,6 +64,14 @@ try {
   });
   assert.equal(teacher.user.role, "teacher");
 
+  for (const expectedRole of ["admin", "teacher", "student"]) {
+    const demoLogin = await json("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email: "example@gmail.com", password: "password123", role: expectedRole })
+    });
+    assert.equal(demoLogin.user.role, expectedRole);
+  }
+
   const teacherStudents = await json("/faculty/students", {
     headers: { Authorization: `Bearer ${teacher.token}` }
   });

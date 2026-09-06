@@ -728,6 +728,54 @@ seedData.teachers = teacherCodes.map((code) => {
   };
 });
 
+// Automated demos may use one documented identity across the three role
+// selectors. Keep this opt-in in production: password123 is intentionally
+// suitable only for local/staging smoke tests, never for a real deployment.
+const demoLoginEnabled = process.env.NODE_ENV !== "production"
+  ? process.env.ALLOW_DEMO_LOGIN !== "false"
+  : process.env.ALLOW_DEMO_LOGIN === "true";
+if (demoLoginEnabled) {
+  const demoEmail = process.env.DEMO_LOGIN_EMAIL || "example@gmail.com";
+  const demoPassword = process.env.DEMO_LOGIN_PASSWORD || "password123";
+  const demoHash = bcrypt.hashSync(demoPassword, 12);
+
+  seedData.admins.push({
+    id: "admin-demo",
+    name: "Demo Administrator",
+    email: demoEmail,
+    password: demoHash,
+    passwordVersion: 0,
+    role: "admin"
+  });
+  seedData.students.push({
+    id: "stu-demo",
+    name: "Demo Student",
+    rollNumber: "DEMO-001",
+    className: "CSE 3A",
+    department: "Computer Science",
+    email: demoEmail,
+    password: demoHash,
+    passwordVersion: 0,
+    phone: "",
+    guardian: "",
+    graduationYear: "2028",
+    approvalStatus: "approved"
+  });
+  seedData.teachers.push({
+    id: "tch-demo",
+    code: "DEMO",
+    name: "Demo Faculty",
+    department: "Computer Science",
+    email: demoEmail,
+    password: demoHash,
+    passwordVersion: 0,
+    role: "teacher",
+    phone: "",
+    cabin: "Faculty Block Demo",
+    subjects: []
+  });
+}
+
 // Give one student per showcased section a fuller attendance history so
 // the attendance/reports views have something realistic to display.
 const highAttendanceStudent = seedData.students.find((student) => student.id === "stu-006");

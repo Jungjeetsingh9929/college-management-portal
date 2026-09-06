@@ -11,6 +11,19 @@ let requestLock = Promise.resolve();
 export async function ensureDatabase() {
   try {
     await fs.access(dbPath);
+    if (process.env.ALLOW_DEMO_LOGIN === "true") {
+      const db = JSON.parse(await fs.readFile(dbPath, "utf8"));
+      let changed = false;
+      for (const [collection, id] of [["admins", "admin-demo"], ["students", "stu-demo"], ["teachers", "tch-demo"]]) {
+        db[collection] ||= [];
+        const account = (seedData[collection] || []).find((item) => item.id === id);
+        if (account && !db[collection].some((item) => item.id === id)) {
+          db[collection].push(account);
+          changed = true;
+        }
+      }
+      if (changed) await atomicWrite(db);
+    }
   } catch {
     await atomicWrite(seedData);
   }
