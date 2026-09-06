@@ -45,6 +45,7 @@ export function StudentProfile() {
           <div className="contact-row"><Phone size={18} /> {user.phone || "-"}</div>
         </article>
       </section>
+      <StudentRecords />
     </div>
   );
 }
