@@ -33,7 +33,7 @@ export function StudentRecords() {
       <div className="section-heading">
         <div>
           <span className="eyebrow">Student account</span>
-          <h2>Student Records</h2>
+          <h2>Student List</h2>
         </div>
         <UsersRound size={22} />
       </div>

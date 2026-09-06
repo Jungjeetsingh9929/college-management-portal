@@ -13,6 +13,7 @@ import { Schedule } from "./pages/Schedule.jsx";
 import { StudentAssignments } from "./pages/StudentAssignments.jsx";
 import { StudentDashboard } from "./pages/StudentDashboard.jsx";
 import { StudentProfile } from "./pages/StudentProfile.jsx";
+import { StudentRecords } from "./pages/StudentRecords.jsx";
 import { AccountSettings } from "./pages/AccountSettings.jsx";
 import { SubjectManagement } from "./pages/SubjectManagement.jsx";
 import { Teachers } from "./pages/Teachers.jsx";
@@ -97,6 +98,16 @@ function AppRoutes() {
           <ProtectedRoute role="student">
             <AppLayout>
               <StudentProfile />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/student-records"
+        element={
+          <ProtectedRoute role="student">
+            <AppLayout>
+              <StudentRecords />
             </AppLayout>
           </ProtectedRoute>
         }
