@@ -1,172 +1,27 @@
-import React, { useEffect, useState } from "react";
-import { QrCode } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { ExternalLink, Plus, QrCode, Send, Square, XCircle } from "lucide-react";
 import { apiFetch } from "../context/api.js";
+import { Badge, EmptyState } from "../components/UI.jsx";
+
+const emptyQuestion = { question: "", options: ["", "", "", ""], correctAnswerIndex: 0 };
 
 export function QuizGenerator() {
-  const [quizzes, setQuizzes] = useState([]);
-  const [classes, setClasses] = useState([]);
-  const [subjects, setSubjects] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  
-  const [form, setForm] = useState({ 
-    className: "", 
-    subjectId: "",
-    question: "", 
-    options: ["", "", "", ""], 
-    correctAnswerIndex: 0 
-  });
-  const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const [quizData, stuData, subjData] = await Promise.all([
-          apiFetch("/faculty/quizzes"),
-          apiFetch("/faculty/students"),
-          apiFetch("/subjects")
-        ]);
-        
-        setQuizzes(quizData.quizzes);
-        setClasses(stuData.classes);
-        setSubjects(subjData.subjects);
-        
-        if (stuData.classes.length > 0) {
-          setForm(f => ({ ...f, className: stuData.classes[0] }));
-        }
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
-  }, []);
-
-  async function handleCreate(e) {
-    e.preventDefault();
-    setMessage("");
-    setError("");
-    try {
-      const { quiz } = await apiFetch("/faculty/quizzes", {
-        method: "POST",
-        body: JSON.stringify(form)
-      });
-      setQuizzes(prev => [...prev, quiz]);
-      setMessage("Quiz created successfully.");
-      setForm({ ...form, question: "", options: ["", "", "", ""] });
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
-  async function toggleActive(id) {
-    try {
-      const { quiz } = await apiFetch(`/faculty/quizzes/${id}/toggle`, {
-        method: "PUT",
-      });
-      setQuizzes(prev => prev.map(q => q.id === id ? quiz : q));
-    } catch (err) {
-      alert("Failed to toggle");
-    }
-  }
-
-  async function handleDelete(id) {
-    try {
-      await apiFetch(`/faculty/quizzes/${id}`, {
-        method: "DELETE",
-      });
-      setQuizzes(prev => prev.filter(q => q.id !== id));
-    } catch (err) {
-      alert("Failed to delete");
-    }
-  }
-
-  const handleOptionChange = (index, value) => {
-    const newOptions = [...form.options];
-    newOptions[index] = value;
-    setForm({ ...form, options: newOptions });
-  };
-
-  if (loading) return <div>Loading...</div>;
-
-  return (
-    <div className="dashboard-content">
-      <div className="card">
-        <h2>Generate QR Attendance Quiz</h2>
-        <p>Create a multiple-choice question for attendance.</p>
-        {message && <div className="success-box">{message}</div>}
-        {error && <div className="error-box">{error}</div>}
-        
-        <form onSubmit={handleCreate} className="form-stack">
-          <label>
-            Class
-            <select value={form.className} onChange={e => setForm({...form, className: e.target.value})} required>
-              {classes.map(cls => (
-                <option key={cls} value={cls}>{cls}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Subject
-            <select value={form.subjectId} onChange={e => setForm({...form, subjectId: e.target.value})} required>
-              <option value="">Select subject</option>
-              {subjects.filter(s => s.className === form.className).map(sub => (
-                <option key={sub.id} value={sub.id}>{sub.subjectName} ({sub.code})</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Question
-            <input type="text" value={form.question} onChange={e => setForm({...form, question: e.target.value})} required />
-          </label>
-          
-          <p>Options:</p>
-          {form.options.map((opt, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <input type="radio" name="correct" checked={form.correctAnswerIndex === i} onChange={() => setForm({...form, correctAnswerIndex: i})} />
-              <input type="text" value={opt} onChange={e => handleOptionChange(i, e.target.value)} required placeholder={`Option ${i+1}`} />
-            </div>
-          ))}
-
-          <button type="submit" className="primary-button">Generate Link</button>
-        </form>
-      </div>
-
-      <div className="card">
-        <h2>Active Quizzes</h2>
-        {quizzes.length > 0 ? (
-          <ul>
-            {quizzes.map(q => {
-              const link = `${window.location.origin}/student/quiz/${q.id}`;
-              const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(link)}`;
-              return (
-                <li key={q.id} style={{ marginBottom: '1rem', borderBottom: '1px solid #eee', paddingBottom: '1rem' }}>
-                  <strong>{q.question}</strong> - Class: {q.className} <br/>
-                  Status: {q.active ? <span style={{color: 'green'}}>Active</span> : <span style={{color: 'red'}}>Inactive</span>} <br/>
-                  
-                  <div style={{ margin: '10px 0', padding: '10px', background: '#f5f5f5', borderRadius: '4px' }}>
-                    <p>Share this link on WhatsApp:</p>
-                    <a href={link} target="_blank" rel="noreferrer" style={{ wordBreak: 'break-all' }}>{link}</a>
-                  </div>
-                  
-                  <div style={{ margin: '10px 0' }}>
-                    <p>Or scan QR Code:</p>
-                    <img src={qrUrl} alt="QR Code" />
-                  </div>
-                  
-                  <button className="primary-button" onClick={() => toggleActive(q.id)} style={{ marginRight: '10px' }}>
-                    {q.active ? 'Deactivate' : 'Activate'}
-                  </button>
-                  <button className="ghost-button" onClick={() => handleDelete(q.id)}>Delete</button>
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <p>You haven't generated any quizzes.</p>
-        )}
-      </div>
-    </div>
-  );
+  const [sessions, setSessions] = useState([]); const [classes, setClasses] = useState([]); const [subjects, setSubjects] = useState([]); const [selectedId, setSelectedId] = useState(""); const [form, setForm] = useState({ className: "", subjectId: "", title: "", durationMinutes: 30 }); const [question, setQuestion] = useState(emptyQuestion); const [loading, setLoading] = useState(true); const [error, setError] = useState(""); const [message, setMessage] = useState("");
+  async function load() { try { setError(""); const [sessionData, studentData, subjectData] = await Promise.all([apiFetch("/faculty/quiz-sessions"), apiFetch("/faculty/students"), apiFetch("/subjects")]); setSessions(sessionData.sessions || []); setClasses(studentData.classes || []); setSubjects(subjectData.subjects || []); if (!form.className && studentData.classes?.length) setForm((prev) => ({ ...prev, className: studentData.classes[0] })); } catch (err) { setError(err.message); } finally { setLoading(false); } }
+  useEffect(() => { load(); }, []);
+  const current = useMemo(() => sessions.find((session) => session.id === selectedId) || sessions[0], [sessions, selectedId]);
+  useEffect(() => { if (!selectedId && sessions[0]) setSelectedId(sessions[0].id); }, [sessions, selectedId]);
+  async function startSession(event) { event.preventDefault(); try { const data = await apiFetch("/faculty/quiz-sessions", { method: "POST", body: JSON.stringify(form) }); setMessage("Live question session started. Display the QR on the classroom desktop."); setSelectedId(data.session.id); setForm((prev) => ({ ...prev, title: "" })); await load(); } catch (err) { setError(err.message); } }
+  async function addQuestion(event) { event.preventDefault(); if (!current) return; try { await apiFetch(`/faculty/quiz-sessions/${current.id}/questions`, { method: "POST", body: JSON.stringify(question) }); setQuestion(emptyQuestion); setMessage("Question added to the live session."); await load(); } catch (err) { setError(err.message); } }
+  async function closeSession() { if (!current) return; try { await apiFetch(`/faculty/quiz-sessions/${current.id}/toggle`, { method: "PUT" }); await load(); } catch (err) { setError(err.message); } }
+  const sessionUrl = current ? `${window.location.origin}/student/quiz-session/${current.id}` : "";
+  const qrUrl = sessionUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=420x420&margin=18&data=${encodeURIComponent(sessionUrl)}` : "";
+  if (loading) return <div className="loading-panel">Loading faculty question sessions…</div>;
+  return <div className="page-stack quiz-workspace">
+    <section className="attendance-hero"><div><span className="eyebrow">Faculty workspace / live classroom</span><h2>QR question sessions</h2><p>Start one class session, display its QR code on the desktop, and add one or more attendance questions while students join.</p></div><div className="live-indicator"><i /> {current?.active ? "Session control ready" : "No live session"}</div></section>
+    {error && <div className="warning-banner"><XCircle size={18} /> {error}</div>}{message && <div className="success-box"><Send size={17} /> {message}</div>}
+    <div className="two-column quiz-layout"><section className="panel"><div className="section-heading"><div><span className="eyebrow">Step 1</span><h2>Start a class session</h2></div><QrCode size={20} color="var(--blue)" /></div><form onSubmit={startSession} className="form-stack"><label>Class<select value={form.className} onChange={(e) => setForm({ ...form, className: e.target.value, subjectId: "" })} required>{classes.map((item) => <option key={item} value={item}>{item}</option>)}</select></label><label>Subject<select value={form.subjectId} onChange={(e) => setForm({ ...form, subjectId: e.target.value })} required><option value="">Select subject</option>{subjects.filter((subject) => subject.className === form.className).map((subject) => <option key={subject.id} value={subject.id}>{subject.subjectName} ({subject.code})</option>)}</select></label><label>Session title <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Week 4 participation check" /></label><label>Duration (minutes)<input type="number" min="5" max="180" value={form.durationMinutes} onChange={(e) => setForm({ ...form, durationMinutes: e.target.value })} /></label><button className="primary-button" type="submit"><QrCode size={16} /> Start and show QR</button></form><div className="session-picker"><span className="eyebrow">Previous sessions</span>{sessions.length ? sessions.map((session) => <button key={session.id} className={session.id === current?.id ? "selected-session" : ""} onClick={() => setSelectedId(session.id)}><span>{session.title}</span><Badge value={session.active ? "live" : "closed"} /></button>) : <p className="muted">No sessions started yet.</p>}</div></section>
+    <section className="panel qr-stage">{current ? <><div className="section-heading"><div><span className="eyebrow">Step 2 · Display on desktop</span><h2>{current.title}</h2><p className="muted">{current.className} · {current.questions?.length || 0} question{current.questions?.length === 1 ? "" : "s"}</p></div><Badge value={current.active ? "live" : "closed"} /></div><div className="qr-frame"><img src={qrUrl} alt="QR code for the live student question session" /><strong>Scan to join the question</strong><span>Students will be asked to log in, then returned directly to this session.</span></div><div className="qr-url"><span>{sessionUrl}</span><button className="ghost-button small" onClick={() => navigator.clipboard?.writeText(sessionUrl)}><ExternalLink size={14} /> Copy link</button></div><button className="secondary-button full" onClick={closeSession} disabled={!current.active}><Square size={14} /> {current.active ? "Close session" : "Session closed"}</button></> : <EmptyState title="Start a session to generate its QR" text="The QR code will remain visible here for the classroom desktop." />}</section></div>
+    {current?.active && <section className="panel"><div className="section-heading"><div><span className="eyebrow">Step 3</span><h2>Add questions to this session</h2></div><Plus size={20} color="var(--blue)" /></div><form onSubmit={addQuestion} className="question-builder"><label className="span-two">Question<input value={question.question} onChange={(e) => setQuestion({ ...question, question: e.target.value })} required placeholder="What should students answer?" /></label>{question.options.map((option, index) => <label key={index}>Option {index + 1}<div className="option-input"><input value={option} onChange={(e) => setQuestion({ ...question, options: question.options.map((item, itemIndex) => itemIndex === index ? e.target.value : item) })} required /><input className="correct-radio" type="radio" name="correctAnswer" checked={question.correctAnswerIndex === index} onChange={() => setQuestion({ ...question, correctAnswerIndex: index })} title="Correct answer" /></div></label>)}<button className="primary-button" type="submit"><Plus size={16} /> Add question</button></form>{current.questions?.length ? <div className="question-list">{current.questions.map((item, index) => <div className="question-item" key={item.id}><span className="question-number">{index + 1}</span><div><strong>{item.question}</strong><span>{item.options.length} answer choices · correct answer is protected</span></div></div>)}</div> : <EmptyState title="No questions yet" text="Add the first question. Students who join through the QR will see it immediately." />}</section>}
+  </div>;
 }

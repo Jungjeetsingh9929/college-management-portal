@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowRight, Bell, BookOpen, Calendar, CalendarCheck, CheckCircle2, Clock3, FileText, GraduationCap, IndianRupee, Megaphone, ShieldCheck, XCircle } from "lucide-react";
+import { AlertTriangle, ArrowRight, Bell, BookOpen, Calendar, CalendarCheck, CheckCircle2, Clock3, FileText, GraduationCap, IndianRupee, Megaphone, QrCode, ShieldCheck, XCircle } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Link, useNavigate } from "react-router-dom";
 import { Badge, DashboardSkeleton, EmptyState, ErrorState, ProgressBar, StatCard } from "../components/UI.jsx";
@@ -51,6 +51,7 @@ export function StudentDashboard() {
       </section>
       {isLow && <div className="warning-banner"><AlertTriangle size={18} /> Attendance is below 75%. Connect with your class teacher before the next review.</div>}
       {holidays.length > 0 && <div className="success-box"><Calendar size={18} /><div><strong>Coming up:</strong> {holidays.map((item) => `${item.title} (${item.date})`).join(", ")}</div></div>}
+      {portal.liveQuizSessions?.length > 0 && <section className="panel live-question-panel"><div className="section-heading"><div><span className="eyebrow">Faculty is live</span><h2>Class question sessions</h2></div><Badge value="Live now" /></div><p className="muted">Your faculty has started a verified attendance question. Open it directly or scan the classroom QR code.</p><div className="live-question-list">{portal.liveQuizSessions.map((session) => <Link className="live-question-card" to={`/student/quiz-session/${session.id}`} key={session.id}><span className="live-question-icon"><QrCode size={19} /></span><div><strong>{session.title}</strong><span>{session.teacherName} · {session.questionCount} question{session.questionCount === 1 ? "" : "s"} · ends {new Date(session.endsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div><ArrowRight size={18} /></Link>)}</div></section>}
 
       <section className="stats-grid">
         <StatCard label="Overall attendance" value={`${portal.attendance.stats.percentage}%`} hint="Across all subjects" tone="blue" icon={CalendarCheck} />

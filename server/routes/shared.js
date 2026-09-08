@@ -118,10 +118,26 @@ sharedRouter.get("/student/portal", requireAuth, async (req, res) => {
     examinations: (db.examinations || []).filter((item) => !item.className || item.className === student.className),
     notices: (db.notices || []).filter((item) => !item.className || item.className === student.className || item.departmentName === student.department).slice(0, 12),
     notes: (db.notes || []).filter((item) => item.className === student.className).slice(0, 30).map((item) => ({ id: item.id, title: item.title, teacherName: item.teacherName, className: item.className, file: item.file, createdAt: item.createdAt })),
+    liveQuizSessions: (db.quizSessions || []).filter((session) => session.active && session.className === student.className && new Date(session.endsAt).getTime() > Date.now()).map((session) => ({ id: session.id, title: session.title, subjectId: session.subjectId, className: session.className, teacherName: session.teacherName, startedAt: session.startedAt, endsAt: session.endsAt, questionCount: (db.quizzes || []).filter((quiz) => quiz.sessionId === session.id && quiz.active).length })),
     fees: (db.fees || []).find((item) => item.studentId === student.id) || { status: "not-published", amountDue: 0, dueDate: null },
     academics: student.academics || { sgpa: null, cgpa: null, subjects: [] },
     holidays: (db.holidays || []).slice(0, 8)
   });
+});
+
+// QR destination for a faculty-led question session. Correct answers are
+// never returned to the student client.
+sharedRouter.get("/quiz-session/:id", requireAuth, async (req, res) => {
+  if (req.user.role !== "student") return res.status(403).json({ message: "Student access required." });
+  const db = await readDb();
+  const student = (db.students || []).find((item) => item.id === req.user.id);
+  const session = (db.quizSessions || []).find((item) => item.id === req.params.id);
+  if (!student || !session || session.className !== student.className) return res.status(404).json({ message: "Question session not found for your class." });
+  if (!session.active || new Date(session.endsAt).getTime() <= Date.now()) return res.status(400).json({ message: "This question session has ended." });
+  const attempts = new Set((db.quizAttempts || []).filter((attempt) => attempt.studentId === student.id).map((attempt) => attempt.quizId));
+  const subject = (db.subjects || []).find((item) => item.id === session.subjectId);
+  const questions = (db.quizzes || []).filter((quiz) => quiz.sessionId === session.id && quiz.active).map((quiz) => ({ id: quiz.id, question: quiz.question, options: quiz.options, attempted: attempts.has(quiz.id) }));
+  res.json({ session: { id: session.id, title: session.title, className: session.className, teacherName: session.teacherName, subjectName: subject?.subjectName || "Subject", startedAt: session.startedAt, endsAt: session.endsAt, questions } });
 });
 
 // Download a faculty note's file. Available to: the teacher who uploaded

@@ -28,6 +28,7 @@ import { MarkAttendance } from "./pages/MarkAttendance.jsx";
 import { AttendanceCommandCenter } from "./pages/AttendanceCommandCenter.jsx";
 import { QuizGenerator } from "./pages/QuizGenerator.jsx";
 import { QuizAnswer } from "./pages/QuizAnswer.jsx";
+import { QuizSession } from "./pages/QuizSession.jsx";
 import { YearSchedule } from "./pages/YearSchedule.jsx";
 import { HODCenter } from "./pages/HODCenter.jsx";
 import { DepartmentDetail } from "./pages/DepartmentDetail.jsx";
@@ -271,6 +272,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route path="/student/quiz-session/:id" element={<ProtectedRoute role="student"><AppLayout><QuizSession /></AppLayout></ProtectedRoute>} />
       <Route
         path="/year-schedule"
         element={

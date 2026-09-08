@@ -286,3 +286,56 @@ facultyRouter.delete("/quizzes/:id", requireAuth, requireTeacher, async (req, re
   await writeDb(db);
   res.json({ ok: true });
 });
+
+// Live question sessions: one desktop QR can open a session containing one or
+// more attendance questions. The existing quiz endpoints remain supported.
+facultyRouter.get("/quiz-sessions", requireAuth, requireTeacher, async (req, res) => {
+  const db = await readDb();
+  db.quizSessions ||= [];
+  db.quizzes ||= [];
+  const sessions = db.quizSessions.filter((session) => session.teacherId === req.user.id).map((session) => ({
+    ...session,
+    questions: db.quizzes.filter((quiz) => quiz.sessionId === session.id).map(({ correctAnswerIndex, ...quiz }) => quiz)
+  }));
+  res.json({ sessions });
+});
+
+facultyRouter.post("/quiz-sessions", requireAuth, requireTeacher, rateLimit({ ...quizCreateConfig, message: "Too many session requests. Please try again later." }), async (req, res) => {
+  const { className, subjectId, title, durationMinutes = 30 } = req.body || {};
+  const db = await readDb();
+  const classesTaught = classesTaughtByTeacher(db, req.user.code);
+  const subject = (db.subjects || []).find((item) => item.id === subjectId);
+  if (!className || !subject || subject.className !== className || !classesTaught.includes(className)) return res.status(403).json({ message: "You can only start sessions for classes and subjects you teach." });
+  db.quizSessions ||= [];
+  const now = new Date();
+  const session = { id: makeId("qsession"), teacherId: req.user.id, teacherName: req.user.name, className, subjectId, title: String(title || `${subject.subjectName} attendance session`).slice(0, 160), active: true, startedAt: now.toISOString(), endsAt: new Date(now.getTime() + Math.min(Math.max(Number(durationMinutes) || 30, 5), 180) * 60000).toISOString(), createdAt: now.toISOString() };
+  db.quizSessions.unshift(session);
+  await writeDb(db);
+  res.status(201).json({ session: { ...session, questions: [], qrPath: `/student/quiz-session/${session.id}` } });
+});
+
+facultyRouter.post("/quiz-sessions/:id/questions", requireAuth, requireTeacher, async (req, res) => {
+  const { question, options, correctAnswerIndex } = req.body || {};
+  const db = await readDb();
+  const session = (db.quizSessions || []).find((item) => item.id === req.params.id && item.teacherId === req.user.id);
+  if (!session) return res.status(404).json({ message: "Question session not found." });
+  if (!session.active) return res.status(409).json({ message: "This session is closed." });
+  if (!question || !Array.isArray(options) || options.length < 2 || options.length > 6 || options.some((option) => !String(option).trim())) return res.status(400).json({ message: "A question with two to six options is required." });
+  const safeCorrectAnswerIndex = parseAnswerIndex(correctAnswerIndex, options.length);
+  if (safeCorrectAnswerIndex === null) return res.status(400).json({ message: "correctAnswerIndex must point to a valid option." });
+  db.quizzes ||= [];
+  const quiz = { id: makeId("quiz"), sessionId: session.id, teacherId: req.user.id, question: requiredText(question, "Question", { max: 500 }), options: options.map((option) => requiredText(option, "Quiz option", { max: 300 })), correctAnswerIndex: safeCorrectAnswerIndex, className: session.className, subjectId: session.subjectId, active: true, createdAt: new Date().toISOString() };
+  db.quizzes.push(quiz);
+  await writeDb(db);
+  const { correctAnswerIndex: _hidden, ...safeQuiz } = quiz;
+  res.status(201).json({ quiz: safeQuiz });
+});
+
+facultyRouter.put("/quiz-sessions/:id/toggle", requireAuth, requireTeacher, async (req, res) => {
+  const db = await readDb();
+  const session = (db.quizSessions || []).find((item) => item.id === req.params.id && item.teacherId === req.user.id);
+  if (!session) return res.status(404).json({ message: "Question session not found." });
+  session.active = !session.active;
+  await writeDb(db);
+  res.json({ session });
+});

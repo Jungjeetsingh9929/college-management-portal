@@ -26,7 +26,7 @@ app.set("trust proxy", process.env.TRUST_PROXY || 1);
 const port = process.env.PORT || 5055;
 const host = process.env.HOST || "127.0.0.1";
 const allowedOrigins = new Set(
-  String(process.env.CLIENT_ORIGIN || process.env.FRONTEND_URL || "")
+  String(process.env.CLIENT_ORIGIN || process.env.FRONTEND_URL || "http://localhost:5175,http://127.0.0.1:5175")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean)
@@ -37,12 +37,14 @@ const distPath = path.resolve(__dirname, "../dist");
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+      const isNonProduction = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
+      const localDevelopmentOrigin = isNonProduction && Boolean(origin) && /^(https?:\/\/)(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+      if (!origin || allowedOrigins.has(origin) || localDevelopmentOrigin || isNonProduction) return callback(null, true);
       return callback(new Error("Origin is not allowed by CORS."));
     }
   })
 );
-app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'"], styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", "data:", "blob:"], connectSrc: ["'self'"], objectSrc: ["'none'"], baseUri: ["'self'"], formAction: ["'self'"], frameAncestors: ["'none'"] } }, hsts: process.env.NODE_ENV === "production" ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false }));
+app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'"], styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", "data:", "blob:", "https://api.qrserver.com"], connectSrc: ["'self'"], objectSrc: ["'none'"], baseUri: ["'self'"], formAction: ["'self'"], frameAncestors: ["'none'"] } }, hsts: process.env.NODE_ENV === "production" ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false }));
 app.use(express.json({ limit: "100kb" }));
 app.use((req, res, next) => {
   if (["POST", "PUT", "PATCH"].includes(req.method) && req.is("application/json") &&

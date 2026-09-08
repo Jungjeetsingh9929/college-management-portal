@@ -95,7 +95,7 @@ export function FacultyAssignments() {
       const data = await apiFetch(`/faculty/assignments/${id}/submissions`);
       setSubmissions(data.submissions);
     } catch (err) {
-      console.error(err);
+      setError(err.message || "Unable to load assignment submissions.");
     }
   }
 
@@ -106,7 +106,7 @@ export function FacultyAssignments() {
       });
       setAssignments(prev => prev.filter(a => a.id !== id));
     } catch (err) {
-      alert("Failed to delete");
+      setError(err.message || "Failed to delete assignment.");
     }
   }
 

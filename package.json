@@ -7,9 +7,9 @@
     "start": "node server/index.js",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "client": "vite --host 0.0.0.0 --port 5175",
-    "server": "node server/index.js",
+    "server": "NODE_ENV=development node server/index.js",
     "seed": "node server/scripts/seed.js",
-    "test": "node tests/api.test.js",
+    "test": "node tests/api.test.js && node tests/quiz-session.test.js",
     "build": "vite build"
   },
   "dependencies": {

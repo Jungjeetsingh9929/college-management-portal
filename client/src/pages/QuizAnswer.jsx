@@ -13,9 +13,11 @@ function getLocation() {
       reject(new Error("Your browser does not support location services."));
       return;
     }
+    const fallbackTimer = window.setTimeout(() => reject(new Error("Location permission is taking too long. Allow location access and try again.")), 20000);
     navigator.geolocation.getCurrentPosition(
-      (position) => resolve(position.coords),
+      (position) => { window.clearTimeout(fallbackTimer); resolve(position.coords); },
       (error) => {
+        window.clearTimeout(fallbackTimer);
         const messages = {
           1: "Location permission was denied. Allow location access to answer this attendance question.",
           2: "Your location could not be determined. Try again with GPS/location turned on.",
