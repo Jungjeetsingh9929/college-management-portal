@@ -315,11 +315,16 @@ facultyRouter.post("/quiz-sessions", requireAuth, requireTeacher, rateLimit({ ..
 });
 
 facultyRouter.post("/quiz-sessions/:id/questions", requireAuth, requireTeacher, async (req, res) => {
+<<<<<<< HEAD
   const { question, options, correctAnswerIndex, answerType = "choice" } = req.body || {};
+=======
+  const { question, options, correctAnswerIndex } = req.body || {};
+>>>>>>> 78613d2d2ecc9f02e71d4658e00f2f6e7ccc4cdc
   const db = await readDb();
   const session = (db.quizSessions || []).find((item) => item.id === req.params.id && item.teacherId === req.user.id);
   if (!session) return res.status(404).json({ message: "Question session not found." });
   if (!session.active) return res.status(409).json({ message: "This session is closed." });
+<<<<<<< HEAD
   if (!question || !["choice", "written"].includes(answerType)) return res.status(400).json({ message: "A question and a valid answer type are required." });
   const safeOptions = answerType === "written" ? [] : options;
   if (answerType === "choice" && (!Array.isArray(safeOptions) || safeOptions.length < 2 || safeOptions.length > 6 || safeOptions.some((option) => !String(option).trim()))) return res.status(400).json({ message: "A choice question needs two to six options." });
@@ -327,6 +332,13 @@ facultyRouter.post("/quiz-sessions/:id/questions", requireAuth, requireTeacher, 
   if (answerType === "choice" && safeCorrectAnswerIndex === null) return res.status(400).json({ message: "correctAnswerIndex must point to a valid option." });
   db.quizzes ||= [];
   const quiz = { id: makeId("quiz"), sessionId: session.id, teacherId: req.user.id, question: requiredText(question, "Question", { max: 500 }), answerType, options: safeOptions.map((option) => requiredText(option, "Quiz option", { max: 300 })), correctAnswerIndex: safeCorrectAnswerIndex, className: session.className, subjectId: session.subjectId, active: true, createdAt: new Date().toISOString() };
+=======
+  if (!question || !Array.isArray(options) || options.length < 2 || options.length > 6 || options.some((option) => !String(option).trim())) return res.status(400).json({ message: "A question with two to six options is required." });
+  const safeCorrectAnswerIndex = parseAnswerIndex(correctAnswerIndex, options.length);
+  if (safeCorrectAnswerIndex === null) return res.status(400).json({ message: "correctAnswerIndex must point to a valid option." });
+  db.quizzes ||= [];
+  const quiz = { id: makeId("quiz"), sessionId: session.id, teacherId: req.user.id, question: requiredText(question, "Question", { max: 500 }), options: options.map((option) => requiredText(option, "Quiz option", { max: 300 })), correctAnswerIndex: safeCorrectAnswerIndex, className: session.className, subjectId: session.subjectId, active: true, createdAt: new Date().toISOString() };
+>>>>>>> 78613d2d2ecc9f02e71d4658e00f2f6e7ccc4cdc
   db.quizzes.push(quiz);
   await writeDb(db);
   const { correctAnswerIndex: _hidden, ...safeQuiz } = quiz;

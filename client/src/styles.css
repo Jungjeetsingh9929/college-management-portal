@@ -1929,6 +1929,7 @@ tbody tr:hover { background: #fafaff; }
 .live-question-panel { border: 1px solid #b8eee3; background: linear-gradient(135deg, #f0fdfa, #ffffff 70%); }.live-question-list, .student-question-list { display: grid; gap: 9px; }.live-question-card, .student-question-card { align-items: center; background: rgba(255,255,255,.85); border: 1px solid #cce9e3; border-radius: 11px; color: inherit; display: flex; gap: 11px; padding: 11px; text-align: left; transition: transform .16s ease, box-shadow .16s ease; }.live-question-card:hover, .student-question-card:hover:not(:disabled) { box-shadow: 0 8px 18px rgba(15, 159, 143, .12); transform: translateY(-1px); }.live-question-icon { align-items: center; background: #d1fae5; border-radius: 9px; color: #047857; display: inline-flex; flex: 0 0 34px; height: 34px; justify-content: center; }.live-question-card div, .student-question-card div { flex: 1; min-width: 0; }.live-question-card strong, .student-question-card strong { display: block; font-size: .88rem; }.live-question-card span:not(.live-question-icon), .student-question-card span:not(.question-number) { color: var(--muted); display: block; font-size: .76rem; margin-top: 4px; }.student-quiz-session .session-instructions { align-items: flex-start; background: #eff6ff; color: #1d4ed8; display: flex; gap: 10px; }.session-instructions strong, .session-instructions span { display: block; }.session-instructions span { color: #486581; font-size: .82rem; line-height: 1.5; margin-top: 4px; }.student-question-card { background: #fbfdff; border-color: #dbe7f3; cursor: pointer; width: 100%; }.student-question-card.attempted { background: #f8fafc; cursor: default; opacity: .75; }.student-question-card > svg { color: #2563eb; flex: 0 0 auto; }.student-question-card.attempted > svg { color: #16a34a; }
 @media (max-width: 900px) { .quiz-layout { grid-template-columns: 1fr; } }
 @media (max-width: 650px) { .question-builder { grid-template-columns: 1fr; }.qr-url { align-items: stretch; flex-direction: column; }.qr-url .ghost-button { width: 100%; } }
+<<<<<<< HEAD
 
 .attendance-modal-backdrop { align-items: center; background: rgba(15, 23, 42, .48); display: flex; inset: 0; justify-content: center; padding: 18px; position: fixed; z-index: 50; }
 .attendance-modal { max-width: 460px; position: relative; width: 100%; }
@@ -1939,3 +1940,5 @@ tbody tr:hover { background: #fafaff; }
 .attendance-qr-frame img { height: 220px; object-fit: contain; width: 220px; }
 .attendance-qr-frame span { color: var(--muted); font-size: .8rem; }
 .attendance-modal .primary-button { align-items: center; display: flex; gap: 8px; justify-content: center; }
+=======
+>>>>>>> 78613d2d2ecc9f02e71d4658e00f2f6e7ccc4cdc
