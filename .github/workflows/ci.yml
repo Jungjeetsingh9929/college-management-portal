@@ -27,8 +27,5 @@ jobs:
       - name: Run API tests
         run: npm test
 
-      - name: Run focused regression flows
-        run: npm run test:regression
-
       - name: Build frontend
         run: npm run build

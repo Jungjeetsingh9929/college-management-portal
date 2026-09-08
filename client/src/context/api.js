@@ -25,5 +25,5 @@ export async function downloadToFile(path, filename) {
   anchor.href = urlObj;
   anchor.download = filename;
   anchor.click();
-  window.setTimeout(() => URL.revokeObjectURL(urlObj), 1000);
+  URL.revokeObjectURL(urlObj);
 }

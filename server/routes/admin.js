@@ -2,7 +2,6 @@ import { Router } from "express";
 import crypto from "node:crypto";
 import { readDb, writeDb } from "../db/fileStore.js";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
-import { calculateStudentStats, enrichAttendance, publicStudent, subjectStats } from "../services/attendanceService.js";
 import { requiredText, validateKeys } from "../services/validation.js";
 
 export const adminRouter = Router();
@@ -53,27 +52,6 @@ adminRouter.get("/overview", requireAuth, requireAdmin, async (_req, res) => {
   const faculty = (db.teachers || []).map((teacher) => ({ id: teacher.id, name: teacher.name, code: teacher.code, department: teacher.department, workload: (db.schedules || []).filter((item) => String(item.teacher || "").toLowerCase().includes(String(teacher.code || "").toLowerCase())).length }));
   const recentActivity = [...(db.notices || []).map((item) => ({ type: "notice", title: item.title, createdAt: item.createdAt })), ...(db.attendance || []).map((item) => ({ type: "attendance", title: "Attendance marked", createdAt: item.createdAt || item.date }))].filter((item) => item.createdAt).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 10);
   res.json({ totals: { students: (db.students || []).length, faculty: (db.teachers || []).length, departments: departments.length, subjects: (db.subjects || []).length, classrooms: (db.classrooms || []).length, todaysClasses: schedulesToday.length }, departments, faculty, classrooms: db.classrooms, todaysClasses: schedulesToday, assignmentStats: { total: db.assignments.length, completed: db.assignmentCompletions.length, overdue: db.assignments.filter((item) => item.dueDate < today).length }, examinationStats: { scheduled: (db.examinations || []).length, publishedResults: (db.results || []).length }, recentActivity, securityAlerts: [{ key: "inactive-students", label: "Inactive student accounts", count: (db.students || []).filter((item) => item.active === false).length }, { key: "pending-requests", label: "Pending student approvals", count: (db.pendingStudents || []).filter((item) => item.approvalStatus === "pending").length }] });
-});
-
-adminRouter.get("/students/:id", requireAuth, requireAdmin, async (req, res) => {
-  const db = await readDb();
-  const student = (db.students || []).find((item) => item.id === req.params.id);
-  if (!student) return res.status(404).json({ message: "Student not found." });
-
-  const attendance = (db.attendance || []).filter((item) => item.studentId === student.id);
-  const assignments = (db.assignments || []).filter((item) => item.className === student.className).map((assignment) => {
-    const completion = (db.assignmentCompletions || []).find((item) => item.assignmentId === assignment.id && item.studentId === student.id);
-    return { id: assignment.id, title: assignment.title, dueDate: assignment.dueDate, teacherName: assignment.teacherName, status: completion ? "completed" : "pending", completedAt: completion?.completedAt || null, marks: completion?.marks ?? null, maxMarks: completion?.maxMarks ?? null };
-  });
-
-  res.json({
-    student: publicStudent(student, db.attendance),
-    attendance: { stats: calculateStudentStats(student.id, db.attendance || []), records: enrichAttendance(attendance.slice(0, 100), db), subjects: subjectStats(student.id, db.subjects || [], db.attendance || []).filter((item) => item.total > 0) },
-    fees: (db.fees || []).find((item) => item.studentId === student.id) || { status: "not-published", amountDue: 0, dueDate: null },
-    assignments,
-    complaints: (db.complaints || []).filter((item) => item.studentId === student.id).slice(0, 50).map(({ attachments, ...complaint }) => complaint),
-    marks: (db.internalMarks || []).filter((item) => item.studentId === student.id).map((item) => ({ ...item, subjectName: (db.subjects || []).find((subject) => subject.id === item.subjectId)?.subjectName || "Unknown subject" }))
-  });
 });
 
 adminRouter.get("/departments", requireAuth, requireAdmin, async (_req, res) => { const db = await readDb(); res.json({ departments: db.departments || [] }); });

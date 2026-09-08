@@ -1,36 +1,37 @@
-import React, { lazy, Suspense } from "react";
+import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { AppLayout } from "./components/AppLayout.jsx";
-const AdminDashboard = lazy(() => import("./pages/AdminDashboard.jsx").then((module) => ({ default: module.AdminDashboard })));
-const AttendanceHistory = lazy(() => import("./pages/AttendanceHistory.jsx").then((module) => ({ default: module.AttendanceHistory })));
-const Complaints = lazy(() => import("./pages/Complaints.jsx").then((module) => ({ default: module.Complaints })));
-const Home = lazy(() => import("./pages/Home.jsx").then((module) => ({ default: module.Home })));
-const Login = lazy(() => import("./pages/Login.jsx").then((module) => ({ default: module.Login })));
-const ResetPassword = lazy(() => import("./pages/ResetPassword.jsx").then((module) => ({ default: module.ResetPassword })));
-const Reports = lazy(() => import("./pages/Reports.jsx").then((module) => ({ default: module.Reports })));
-const Schedule = lazy(() => import("./pages/Schedule.jsx").then((module) => ({ default: module.Schedule })));
-const CentralTimetable = lazy(() => import("./pages/CentralTimetable.jsx").then((module) => ({ default: module.CentralTimetable })));
-const StudentAssignments = lazy(() => import("./pages/StudentAssignments.jsx").then((module) => ({ default: module.StudentAssignments })));
-const StudentDashboard = lazy(() => import("./pages/StudentDashboard.jsx").then((module) => ({ default: module.StudentDashboard })));
-const StudentProfile = lazy(() => import("./pages/StudentProfile.jsx").then((module) => ({ default: module.StudentProfile })));
-const StudentRecords = lazy(() => import("./pages/StudentRecords.jsx").then((module) => ({ default: module.StudentRecords })));
-const AccountSettings = lazy(() => import("./pages/AccountSettings.jsx").then((module) => ({ default: module.AccountSettings })));
-const SubjectManagement = lazy(() => import("./pages/SubjectManagement.jsx").then((module) => ({ default: module.SubjectManagement })));
-const AdminResources = lazy(() => import("./pages/AdminResources.jsx").then((module) => ({ default: module.AdminResources })));
-const SecurityDashboard = lazy(() => import("./pages/SecurityDashboard.jsx").then((module) => ({ default: module.SecurityDashboard })));
-const Teachers = lazy(() => import("./pages/Teachers.jsx").then((module) => ({ default: module.Teachers })));
-const FacultyDashboard = lazy(() => import("./pages/FacultyDashboard.jsx").then((module) => ({ default: module.FacultyDashboard })));
-const FacultyAssignments = lazy(() => import("./pages/FacultyAssignments.jsx").then((module) => ({ default: module.FacultyAssignments })));
-const FacultyTools = lazy(() => import("./pages/FacultyTools.jsx").then((module) => ({ default: module.FacultyTools })));
-const MarkAttendance = lazy(() => import("./pages/MarkAttendance.jsx").then((module) => ({ default: module.MarkAttendance })));
-const QuizGenerator = lazy(() => import("./pages/QuizGenerator.jsx").then((module) => ({ default: module.QuizGenerator })));
-const QuizAnswer = lazy(() => import("./pages/QuizAnswer.jsx").then((module) => ({ default: module.QuizAnswer })));
-const YearSchedule = lazy(() => import("./pages/YearSchedule.jsx").then((module) => ({ default: module.YearSchedule })));
-const HODCenter = lazy(() => import("./pages/HODCenter.jsx").then((module) => ({ default: module.HODCenter })));
-const DepartmentDetail = lazy(() => import("./pages/DepartmentDetail.jsx").then((module) => ({ default: module.DepartmentDetail })));
-const FeesCenter = lazy(() => import("./pages/FeesCenter.jsx").then((module) => ({ default: module.FeesCenter })));
+import { AdminDashboard } from "./pages/AdminDashboard.jsx";
+import { AttendanceHistory } from "./pages/AttendanceHistory.jsx";
+import { Complaints } from "./pages/Complaints.jsx";
+import { Home } from "./pages/Home.jsx";
+import { Login } from "./pages/Login.jsx";
+import { ResetPassword } from "./pages/ResetPassword.jsx";
+import { Reports } from "./pages/Reports.jsx";
+import { Schedule } from "./pages/Schedule.jsx";
+import { CentralTimetable } from "./pages/CentralTimetable.jsx";
+import { StudentAssignments } from "./pages/StudentAssignments.jsx";
+import { StudentDashboard } from "./pages/StudentDashboard.jsx";
+import { StudentProfile } from "./pages/StudentProfile.jsx";
+import { StudentRecords } from "./pages/StudentRecords.jsx";
+import { AccountSettings } from "./pages/AccountSettings.jsx";
+import { SubjectManagement } from "./pages/SubjectManagement.jsx";
+import { AdminResources } from "./pages/AdminResources.jsx";
+import { SecurityDashboard } from "./pages/SecurityDashboard.jsx";
+import { Teachers } from "./pages/Teachers.jsx";
+import { FacultyDashboard } from "./pages/FacultyDashboard.jsx";
+import { FacultyAssignments } from "./pages/FacultyAssignments.jsx";
+import { FacultyTools } from "./pages/FacultyTools.jsx";
+import { MarkAttendance } from "./pages/MarkAttendance.jsx";
+import { AttendanceCommandCenter } from "./pages/AttendanceCommandCenter.jsx";
+import { QuizGenerator } from "./pages/QuizGenerator.jsx";
+import { QuizAnswer } from "./pages/QuizAnswer.jsx";
+import { YearSchedule } from "./pages/YearSchedule.jsx";
+import { HODCenter } from "./pages/HODCenter.jsx";
+import { DepartmentDetail } from "./pages/DepartmentDetail.jsx";
+import { FeesCenter } from "./pages/FeesCenter.jsx";
 import { PwaInstallPrompt } from "./components/PwaInstallPrompt.jsx";
 import { ToastProvider } from "./components/UI.jsx";
 import "./styles.css";
@@ -52,8 +53,7 @@ function ProtectedRoute({ children, role, roles }) {
 
 function AppRoutes() {
   return (
-    <Suspense fallback={<div className="screen-loader">Loading page...</div>}>
-      <Routes>
+    <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/reset-password" element={<ResetPassword />} />
@@ -230,6 +230,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route path="/attendance-center" element={<ProtectedRoute roles={["teacher", "admin"]}><AppLayout><AttendanceCommandCenter /></AppLayout></ProtectedRoute>} />
       <Route
         path="/faculty/assignments"
         element={
@@ -281,8 +282,7 @@ function AppRoutes() {
         }
       />
       <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+    </Routes>
   );
 }
 

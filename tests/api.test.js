@@ -112,12 +112,6 @@ try {
   const allStudents = await json("/students", {
     headers: { Authorization: `Bearer ${admin.token}` }
   });
-  const adminStudentDetail = await json(`/admin/students/${allStudents.students[0].id}`, {
-    headers: { Authorization: `Bearer ${admin.token}` }
-  });
-  assert.equal(adminStudentDetail.student.id, allStudents.students[0].id);
-  assert.ok(adminStudentDetail.attendance.stats);
-  assert.ok(!("password" in adminStudentDetail.student));
   const visibleIds = new Set(teacherStudents.students.map((item) => item.id));
   const outsideStudent = allStudents.students.find((item) => !visibleIds.has(item.id));
   assert.ok(outsideStudent, "seed data should contain a student outside the teacher's classes");

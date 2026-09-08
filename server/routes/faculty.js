@@ -80,9 +80,8 @@ facultyRouter.post("/notices", requireAuth, requireTeacher, async (req, res) => 
 facultyRouter.post("/notes", requireAuth, requireTeacher, (req, res, next) => noteUpload.single("file")(req, res, (error) => { if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") return res.status(413).json({ message: "Note file is too large." }); if (error || !req.file) return res.status(400).json({ message: "Submit one PDF, PNG, or JPEG note file." }); next(); }), async (req, res) => {
   if (!validNoteMagic(req.file)) return res.status(400).json({ message: "The uploaded note content does not match its declared type." });
   const db = await readDb(); const scope = teacherScope(db, req.user); const className = String(req.body.className || ""); if (!className || !scope.classes.includes(className)) return res.status(403).json({ message: "You can only upload notes for your classes." });
-  const originalName = path.basename(String(req.file.originalname || "note")).replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 120) || "note";
   const extension = req.file.mimetype === "application/pdf" ? "pdf" : req.file.mimetype === "image/png" ? "png" : "jpg"; const storedName = `${crypto.randomUUID()}.${extension}`; await saveFile({ storedName, buffer: req.file.buffer, localDir: facultyUploadRoot });
-  db.notes ||= []; const note = { id: crypto.randomUUID(), title: String(req.body.title || originalName).trim().slice(0, 160), className, teacherId: req.user.id, teacherName: req.user.name, file: { name: originalName, type: req.file.mimetype, size: req.file.size, storedName }, createdAt: new Date().toISOString() }; db.notes.unshift(note); await writeDb(db); res.status(201).json({ note });
+  db.notes ||= []; const note = { id: crypto.randomUUID(), title: String(req.body.title || req.file.originalname).slice(0, 160), className, teacherId: req.user.id, teacherName: req.user.name, file: { name: req.file.originalname.slice(0, 120), type: req.file.mimetype, size: req.file.size, storedName }, createdAt: new Date().toISOString() }; db.notes.unshift(note); await writeDb(db); res.status(201).json({ note });
 });
 
 // 3. Assignments
