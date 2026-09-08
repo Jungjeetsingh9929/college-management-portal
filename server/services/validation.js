@@ -1,0 +1,41 @@
+export function requiredText(value, field, { min = 1, max = 160 } = {}) {
+  if (typeof value !== "string") throw new Error(`${field} must be text.`);
+  const text = value.trim();
+  if (text.length < min || text.length > max) {
+    throw new Error(`${field} must be between ${min} and ${max} characters.`);
+  }
+  return text;
+}
+
+export function validEmail(value) {
+  return typeof value === "string" && value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+export function validId(value) {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(value);
+}
+
+export function validTime(value) {
+  return typeof value === "string" && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+export function enumValue(value, field, values) {
+  if (typeof value !== "string" || !values.includes(value)) throw new Error(`${field} is invalid.`);
+  return value;
+}
+
+export function validPassword(value) {
+  return typeof value === "string" && value.length >= 12 && value.length <= 200 && /[a-z]/.test(value) && /[A-Z]/.test(value) && /\d/.test(value) && /[^A-Za-z0-9\s]/.test(value);
+}
+
+export const PASSWORD_REQUIREMENTS = "Password must be 12-200 characters and include upper-case, lower-case, numeric, and symbol characters.";
+
+export function parseAnswerIndex(value, optionCount) {
+  const index = Number(value);
+  return Number.isInteger(index) && index >= 0 && index < optionCount ? index : null;
+}
+
+export function validateKeys(body, allowed) {
+  const unknown = Object.keys(body).filter((key) => !allowed.includes(key));
+  if (unknown.length) throw new Error("Request contains unsupported fields.");
+}
