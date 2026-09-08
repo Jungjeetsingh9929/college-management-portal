@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+*.env
+*.env.*
+GENERATED_CREDENTIALS.*
+CREDENTIAL_IMPORT_*
+HOD_TEMPORARY_ASSIGNMENTS.md
+server/db/database.json
+storage/
+.DS_Store
+*.log
+*.zip
+coverage/
+.vite/
