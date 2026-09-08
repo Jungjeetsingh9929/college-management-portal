@@ -57,6 +57,20 @@ try {
   });
   assert.equal(admin.user.role, "admin");
 
+  const adminFees = await json("/admin/fees", {
+    headers: { Authorization: `Bearer ${admin.token}` }
+  });
+  assert.ok(adminFees.structures.length > 0);
+  assert.ok(adminFees.studentFees.length > 0);
+  assert.ok(adminFees.studentFees.every((item) => !("password" in item)));
+  const firstDepartment = adminFees.structures[0].departmentId;
+  const departmentNotice = await json("/admin/notices", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${admin.token}` },
+    body: JSON.stringify({ departmentId: firstDepartment, title: "Fee desk hours", body: "The finance desk is open this week.", category: "fee" })
+  });
+  assert.equal(departmentNotice.notice.departmentId, firstDepartment);
+
   const student = await json("/auth/login", {
     method: "POST",
     body: JSON.stringify({
@@ -66,6 +80,11 @@ try {
     })
   });
   assert.equal(student.user.role, "student");
+
+  const studentFeesDenied = await request("/admin/fees", {
+    headers: { Authorization: `Bearer ${student.token}` }
+  });
+  assert.equal(studentFeesDenied.response.status, 403);
 
   const teacher = await json("/auth/login", {
     method: "POST",
@@ -93,6 +112,12 @@ try {
   const allStudents = await json("/students", {
     headers: { Authorization: `Bearer ${admin.token}` }
   });
+  const adminStudentDetail = await json(`/admin/students/${allStudents.students[0].id}`, {
+    headers: { Authorization: `Bearer ${admin.token}` }
+  });
+  assert.equal(adminStudentDetail.student.id, allStudents.students[0].id);
+  assert.ok(adminStudentDetail.attendance.stats);
+  assert.ok(!("password" in adminStudentDetail.student));
   const visibleIds = new Set(teacherStudents.students.map((item) => item.id));
   const outsideStudent = allStudents.students.find((item) => !visibleIds.has(item.id));
   assert.ok(outsideStudent, "seed data should contain a student outside the teacher's classes");

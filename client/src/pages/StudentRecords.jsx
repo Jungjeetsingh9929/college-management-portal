@@ -2,8 +2,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Search, UsersRound } from "lucide-react";
 import { Badge, EmptyState } from "../components/UI.jsx";
 import { apiFetch } from "../context/api.js";
+import { useAuth } from "../context/AuthContext.jsx";
 
 export function StudentRecords() {
+  const { user } = useAuth();
   const [records, setRecords] = useState([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
@@ -27,15 +29,15 @@ export function StudentRecords() {
         <div className="section-heading">
           <div>
             <span className="eyebrow">Student account</span>
-            <h2>Student List</h2>
+            <h2>{user?.role === "student" ? "My Student Record" : "Student List"}</h2>
           </div>
           <UsersRound size={22} />
         </div>
-        <p className="helper-text">Search your student record and filter its approval status. Student accounts can view only their own record.</p>
+        <p className="helper-text">{user?.role === "student" ? "View your own student record and approval status. Other students’ records are not visible to you." : "Search student records and filter by approval status."}</p>
         <div className="toolbar">
           <label className="search-field">
             <Search size={17} />
-            <input aria-label="Search student records" placeholder="Search name, roll number, or class" value={query} onChange={(event) => setQuery(event.target.value)} />
+            <input aria-label={user?.role === "student" ? "Search my student record" : "Search student records"} placeholder={user?.role === "student" ? "Search your record" : "Search name, roll number, or class"} value={query} onChange={(event) => setQuery(event.target.value)} />
           </label>
           <label>
             Status

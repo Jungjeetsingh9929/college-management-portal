@@ -4,12 +4,25 @@ import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../context/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
+function readRecentSearches(key) {
+  try {
+    const stored = JSON.parse(localStorage.getItem(key) || "[]");
+    if (!Array.isArray(stored)) return [];
+    return stored
+      .map((item) => typeof item === "string" ? { title: item, href: "", type: "recent" } : item)
+      .filter((item) => item && typeof item.title === "string" && typeof item.href === "string");
+  } catch {
+    localStorage.removeItem(key);
+    return [];
+  }
+}
+
 export function GlobalSearch() {
-  const { user } = useAuth(); const navigate = useNavigate(); const inputRef = useRef(null); const [query, setQuery] = useState(""); const [data, setData] = useState({ suggestions: [], results: [] }); const [loading, setLoading] = useState(false); const [open, setOpen] = useState(false); const [active, setActive] = useState(0); const key = `portal-searches-${user?.role || "guest"}`; const [recent, setRecent] = useState(() => JSON.parse(localStorage.getItem(key) || "[]"));
+  const { user } = useAuth(); const navigate = useNavigate(); const inputRef = useRef(null); const [query, setQuery] = useState(""); const [data, setData] = useState({ suggestions: [], results: [] }); const [loading, setLoading] = useState(false); const [open, setOpen] = useState(false); const [active, setActive] = useState(0); const key = `portal-searches-${user?.role || "guest"}`; const [recent, setRecent] = useState(() => readRecentSearches(key));
   useEffect(() => { const handler = (event) => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); inputRef.current?.focus(); setOpen(true); } }; window.addEventListener("keydown", handler); return () => window.removeEventListener("keydown", handler); }, []);
   useEffect(() => { if (!open) return undefined; if (!query.trim()) { setData({ suggestions: [], results: [] }); setLoading(false); return undefined; } setLoading(true); const timer = setTimeout(async () => { try { setData(await apiFetch(`/shared/search?q=${encodeURIComponent(query)}`)); } catch { setData({ suggestions: [], results: [] }); } finally { setLoading(false); } }, 180); return () => clearTimeout(timer); }, [query, open]);
-  const entries = query.trim() ? data.results : recent.map((item) => ({ ...item, type: "recent" }));
-  function choose(item) { const next = [item.title, ...recent.filter((value) => value.title !== item.title)].slice(0, 6); setRecent(next); localStorage.setItem(key, JSON.stringify(next)); setQuery(""); setOpen(false); navigate(item.href); }
+  const entries = query.trim() ? data.results : recent;
+  function choose(item) { if (!item?.href) return; const saved = { title: item.title, subtitle: item.subtitle || "", href: item.href, type: "recent" }; const next = [saved, ...recent.filter((value) => value.title !== item.title)].slice(0, 6); setRecent(next); localStorage.setItem(key, JSON.stringify(next)); setQuery(""); setOpen(false); navigate(item.href); }
   function onKeyDown(event) { if (event.key === "Escape") { setOpen(false); inputRef.current?.blur(); } if (event.key === "ArrowDown") { event.preventDefault(); setActive((value) => Math.min(value + 1, Math.max(0, entries.length - 1))); } if (event.key === "ArrowUp") { event.preventDefault(); setActive((value) => Math.max(0, value - 1)); } if (event.key === "Enter" && entries[active]) { event.preventDefault(); choose(entries[active]); } }
   return <div className="global-search-wrap"><label className="global-search"><Search size={17} /><input ref={inputRef} aria-label="Global search" placeholder="Search portal" value={query} onFocus={() => setOpen(true)} onChange={(event) => { setQuery(event.target.value); setActive(0); }} onKeyDown={onKeyDown} /><kbd>⌘ K</kbd>{query && <button className="search-clear" type="button" aria-label="Clear search" onClick={() => setQuery("")}><X size={14} /></button>}</label>{open && <><button className="search-dismiss" aria-label="Close search" onClick={() => setOpen(false)} /><div className="search-popover"><div className="search-popover-head"><strong>{query ? "Search results" : "Recent searches"}</strong>{loading && <span className="search-loading">Searching…</span>}</div>{!query && !recent.length && <div className="search-empty"><Clock3 size={17} /><span>Search subjects, people, classes, notices, and more.</span></div>}{query && !loading && !entries.length && <div className="search-empty"><Search size={17} /><span>No matching results for “{query}”.</span></div>}{entries.map((item, index) => <button type="button" key={`${item.type}-${item.id || item.title}`} className={`search-result ${index === active ? "active" : ""}`} onMouseEnter={() => setActive(index)} onClick={() => choose(item)}><span className="search-result-type">{item.type}</span><span><strong>{item.title}</strong><small>{item.subtitle}</small></span></button>)}</div></>}</div>;
 }

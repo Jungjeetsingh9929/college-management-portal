@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { BarChart3, Bell, BookOpen, Building2, CalendarDays, ClipboardCheck, ClipboardList, GraduationCap, History, KeyRound, LayoutDashboard, LogOut, Menu, ShieldCheck, UserRound, UsersRound, Calendar, FileText, QrCode, X } from "lucide-react";
+import { BarChart3, Bell, BookOpen, Building2, CalendarDays, ClipboardCheck, ClipboardList, CreditCard, GraduationCap, History, KeyRound, LayoutDashboard, LogOut, Menu, ShieldCheck, UserRound, UsersRound, Calendar, FileText, QrCode, X } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { GlobalSearch } from "./GlobalSearch.jsx";
@@ -16,12 +16,12 @@ export function AppLayout({ children }) {
     admin: [
       { to: "/admin", label: "Dashboard", icon: LayoutDashboard }, { to: "/subjects", label: "Subjects", icon: BookOpen },
       { to: "/mark-attendance", label: "Mark Attendance", icon: ClipboardCheck }, { to: "/central-timetable", label: "Central Timetable", icon: CalendarDays }, { to: "/schedule", label: "Schedule", icon: CalendarDays },
-      { to: "/teachers", label: "Teachers", icon: UsersRound }, { to: "/admin/resources", label: "Departments & Rooms", icon: Building2 }, { to: "/admin/security", label: "Security Center", icon: ShieldCheck }, { to: "/complaints", label: "Complaints", icon: ClipboardList },
+      { to: "/teachers", label: "Teachers", icon: UsersRound }, { to: "/fees", label: "Fees & Notices", icon: CreditCard }, { to: "/admin/resources", label: "Departments & Rooms", icon: Building2 }, { to: "/admin/security", label: "Security Center", icon: ShieldCheck }, { to: "/complaints", label: "Complaints", icon: ClipboardList },
       { to: "/history", label: "History", icon: History }, { to: "/reports", label: "Reports", icon: BarChart3 },
       { to: "/year-schedule", label: "Year Schedule", icon: Calendar }, { to: "/account", label: "Account settings", icon: KeyRound }
     ],
     teacher: [
-      { to: "/faculty", label: "Dashboard", icon: LayoutDashboard }, { to: "/faculty/assignments", label: "Assignments", icon: FileText },
+      { to: "/faculty", label: "Dashboard", icon: LayoutDashboard }, { to: "/fees", label: "Fees & Notices", icon: CreditCard }, { to: "/faculty/assignments", label: "Assignments", icon: FileText },
       { to: "/mark-attendance", label: "Mark Attendance", icon: ClipboardCheck }, { to: "/faculty/quiz-generate", label: "QR Attendance", icon: QrCode },
       { to: "/schedule", label: "Class Schedule", icon: CalendarDays }, { to: "/faculty/tools", label: "Marks & Notices", icon: ClipboardCheck }, { to: "/complaints", label: "Complaints", icon: ClipboardList },
       { to: "/year-schedule", label: "Year Schedule", icon: Calendar }, { to: "/account", label: "Account settings", icon: KeyRound }
@@ -29,7 +29,7 @@ export function AppLayout({ children }) {
     student: [
       { to: "/student", label: "Dashboard", icon: LayoutDashboard }, { to: "/assignments", label: "Assignments", icon: FileText },
       { to: "/schedule", label: "Schedule", icon: CalendarDays }, { to: "/teachers", label: "Teachers", icon: UsersRound },
-      { to: "/complaints", label: "Complaints", icon: ClipboardList }, { to: "/student-records", label: "Student List", icon: UsersRound },
+      { to: "/complaints", label: "Complaints", icon: ClipboardList }, { to: "/student-records", label: "My Student Record", icon: UsersRound },
       { to: "/history", label: "History", icon: History }, { to: "/profile", label: "Profile", icon: UserRound },
       { to: "/year-schedule", label: "Year Schedule", icon: Calendar }, { to: "/account", label: "Account settings", icon: KeyRound }
     ]

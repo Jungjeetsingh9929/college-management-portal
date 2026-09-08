@@ -4,6 +4,7 @@ import { teacherLegend, departmentNames } from "./teacherLegend.js";
 import { part2aSchedule } from "./schedule_part2a.js";
 import { part2bSchedule } from "./schedule_part2b.js";
 import { validPassword, PASSWORD_REQUIREMENTS } from "../services/validation.js";
+import { feeStructures2026 } from "./feeStructures2026.js";
 
 const demoAdminEmail = process.env.SEED_ADMIN_EMAIL || "admin@example.edu";
 const demoAdminName = process.env.SEED_ADMIN_NAME || "Admin";
@@ -951,6 +952,25 @@ const facultyForDepartment = (departmentName, index) => {
 seedData.departments = seededDepartmentNames.map((name, index) => {
   const hod = facultyForDepartment(name, index);
   return { id: `dept-${String(index + 1).padStart(2, "0")}`, name, hodId: hod?.id || "", temporaryHod: true };
+});
+
+// Official per-program fee structures for AY 2026-27 (see server/db/feeStructures2026.js).
+// These are separate from the per-department feeStructures used by the admin/HOD
+// fee editor above, since a single department here can host several distinct
+// programs (e.g. Computer Science & Engineering has B.Tech, Lateral Entry, and
+// Data Science variants with different tuition), each with its own published fee sheet.
+seedData.programFeeStructures = feeStructures2026;
+seedData.notices ||= [];
+seedData.notices.unshift({
+  id: "notice-fees-2026-27",
+  title: "Fee Structure Published for Academic Year 2026-27",
+  body: "The fee structure for AY 2026-27 has been published for all programs. Semester 1 fees are payable at the time of admission and Semester 2 fees are payable in January. Tuition and other fees per semester are due by 7th July and 7th January every year; a fine of Rs. 50/- per day applies after the due date. Hostel facility is optional. See the Fees Center for the full program-wise breakdown.",
+  category: "academic",
+  departmentId: "",
+  departmentName: "All Departments",
+  teacherId: "",
+  teacherName: "Administration",
+  createdAt: new Date().toISOString()
 });
 
 // Optional per-account credential overrides. The generated credential template

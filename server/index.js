@@ -17,6 +17,7 @@ import { facultyRouter } from "./routes/faculty.js";
 import { sharedRouter } from "./routes/shared.js";
 import { adminRouter } from "./routes/admin.js";
 import { hodRouter } from "./routes/hod.js";
+import { feesRouter } from "./routes/fees.js";
 import { clientKey, rateConfig, rateLimit } from "./middleware/rateLimit.js";
 import { recordAudit, safeAuditValue } from "./services/auditService.js";
 
@@ -93,6 +94,7 @@ app.use("/api/schedules", schedulesRouter);
 app.use("/api/teachers", teachersRouter);
 app.use("/api/faculty", facultyRouter);
 app.use("/api/hod", hodRouter);
+app.use("/api", feesRouter);
 app.use("/api/shared/search", rateLimit({ ...rateConfig("SEARCH_API", { windowMs: 60 * 1000, limit: 30, backoffBaseMs: 250, backoffMaxMs: 10000 }), keyGenerator: clientKey, message: "Too many search requests. Please try again later." }));
 app.use("/api/shared", sharedRouter);
 app.use("/api/admin", rateLimit({ ...rateConfig("ADMIN_API", { windowMs: 60 * 1000, limit: 60, backoffBaseMs: 500, backoffMaxMs: 30000 }), keyGenerator: clientKey, message: "Too many administrative requests. Please try again later." }), adminRouter);

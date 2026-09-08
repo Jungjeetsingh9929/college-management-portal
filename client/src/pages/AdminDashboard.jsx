@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Edit3, Plus, Save, Search, Trash2, X } from "lucide-react";
+import { Edit3, Eye, Plus, Save, Search, Trash2, X } from "lucide-react";
 import { Badge, DashboardSkeleton, ErrorState, Modal, StatCard, useToast } from "../components/UI.jsx";
 import { apiFetch } from "../context/api.js";
 
@@ -37,6 +37,9 @@ export function AdminDashboard() {
   const [form, setForm] = useState(blankStudent);
   const [editingStudentId, setEditingStudentId] = useState("");
   const [showStudentModal, setShowStudentModal] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [studentPanelLoading, setStudentPanelLoading] = useState(false);
+  const [studentPanelError, setStudentPanelError] = useState("");
   const [loadError, setLoadError] = useState("");
   const { showToast } = useToast() || {};
 
@@ -134,6 +137,19 @@ export function AdminDashboard() {
     await apiFetch(`/students/${student.id}/status`, { method: "PATCH", body: JSON.stringify({ active: student.active === false }) });
     await loadData();
     showToast?.(student.active === false ? "Student reactivated." : "Student deactivated.", "success");
+  }
+
+  async function openStudentPanel(student) {
+    setSelectedStudent({ student });
+    setStudentPanelLoading(true);
+    setStudentPanelError("");
+    try {
+      setSelectedStudent(await apiFetch(`/admin/students/${student.id}`));
+    } catch (error) {
+      setStudentPanelError(error.message || "Unable to load this student.");
+    } finally {
+      setStudentPanelLoading(false);
+    }
   }
 
   if (loadError && !summary) return <ErrorState text={loadError} onRetry={loadData} />;
@@ -297,12 +313,15 @@ export function AdminDashboard() {
               <tbody>
                 {filteredStudents.map((student) => (
                   <tr key={student.id}>
-                    <td>{student.name}<span>{student.rollNumber}</span></td>
+                    <td><button className="link-button" type="button" onClick={() => openStudentPanel(student)}><strong>{student.name}</strong></button><span>{student.rollNumber}</span></td>
                     <td>{student.className}<span>{student.department}</span></td>
                     <td><Badge value={`${student.attendancePercentage}%`} /></td>
                     <td><Badge value={student.approvalStatus || "approved"} /></td>
                     <td>
-                      <button className="icon-button" onClick={() => editStudent(student)} title="Edit student">
+                      <button className="icon-button" type="button" onClick={() => openStudentPanel(student)} title="View student details">
+                        <Eye size={16} />
+                      </button>
+                      <button className="icon-button" type="button" onClick={() => editStudent(student)} title="Edit student">
                         <Edit3 size={16} />
                       </button>
                       <button className="secondary-button" type="button" onClick={() => toggleStudent(student)}>{student.active === false ? "Activate" : "Deactivate"}</button>
@@ -317,6 +336,25 @@ export function AdminDashboard() {
           </div>
         </div>
       </section>
+      <Modal open={Boolean(selectedStudent)} onClose={() => { setSelectedStudent(null); setStudentPanelError(""); }} title={selectedStudent?.student?.name || "Student details"} description="Admin overview of the selected student's academic and operational records." wide>
+        {studentPanelLoading && <DashboardSkeleton />}
+        {studentPanelError && <ErrorState text={studentPanelError} onRetry={() => selectedStudent?.student && openStudentPanel(selectedStudent.student)} />}
+        {!studentPanelLoading && !studentPanelError && selectedStudent?.student && <div className="page-stack">
+          <section className="stats-grid">
+            <StatCard label="Attendance" value={`${selectedStudent.attendance?.stats?.percentage ?? 0}%`} hint={`${selectedStudent.attendance?.stats?.present ?? 0} present · ${selectedStudent.attendance?.stats?.absent ?? 0} absent`} tone="green" />
+            <StatCard label="Assignments" value={selectedStudent.assignments?.length ?? 0} hint={`${selectedStudent.assignments?.filter((item) => item.status === "completed").length ?? 0} completed`} tone="blue" />
+            <StatCard label="Complaints" value={selectedStudent.complaints?.length ?? 0} hint="Submitted requests" tone="amber" />
+            <StatCard label="Fees" value={selectedStudent.fees?.status || "Not published"} hint={selectedStudent.fees?.amountDue ? `Due ${selectedStudent.fees.amountDue}` : "Current fee status"} tone="amber" />
+          </section>
+          <section className="two-column">
+            <div className="panel"><div className="section-heading"><div><span className="eyebrow">Profile</span><h2>Student information</h2></div></div><div className="detail-grid"><div><span>Name</span><strong>{selectedStudent.student.name}</strong></div><div><span>Roll number</span><strong>{selectedStudent.student.rollNumber}</strong></div><div><span>Email</span><strong>{selectedStudent.student.email}</strong></div><div><span>Class</span><strong>{selectedStudent.student.className}</strong></div><div><span>Department</span><strong>{selectedStudent.student.department}</strong></div><div><span>Guardian</span><strong>{selectedStudent.student.guardian || "—"}</strong></div><div><span>Phone</span><strong>{selectedStudent.student.phone || "—"}</strong></div><div><span>Status</span><strong><Badge value={selectedStudent.student.active === false ? "inactive" : selectedStudent.student.approvalStatus || "approved"} /></strong></div></div></div>
+            <div className="panel"><div className="section-heading"><div><span className="eyebrow">Fees</span><h2>Fee status</h2></div><Badge value={selectedStudent.fees?.status || "not-published"} /></div><p className="helper-text">Amount due: <strong>{selectedStudent.fees?.amountDue ?? 0}</strong></p><p className="helper-text">Due date: <strong>{selectedStudent.fees?.dueDate || "Not published"}</strong></p><p className="helper-text">Last payment: <strong>{selectedStudent.fees?.lastPaymentDate || "—"}</strong></p></div>
+          </section>
+          <section className="panel"><div className="section-heading"><div><span className="eyebrow">Attendance</span><h2>Subject attendance</h2></div></div>{selectedStudent.attendance?.subjects?.length ? <div className="table-wrap compact-table"><table><thead><tr><th>Subject</th><th>Present</th><th>Absent</th><th>Percentage</th></tr></thead><tbody>{selectedStudent.attendance.subjects.map((item) => <tr key={item.subjectId}><td>{item.subjectName}</td><td>{item.present}</td><td>{item.absent}</td><td><Badge value={`${item.percentage}%`} /></td></tr>)}</tbody></table></div> : <p className="helper-text">No attendance records available.</p>}</section>
+          <section className="two-column"><div className="panel"><div className="section-heading"><div><span className="eyebrow">Assignments</span><h2>Completion status</h2></div></div>{selectedStudent.assignments?.length ? <div className="list-stack">{selectedStudent.assignments.map((item) => <div className="list-row" key={item.id}><div><strong>{item.title}</strong><span>{item.teacherName || "Faculty"} · Due {item.dueDate}</span></div><Badge value={item.status} /></div>)}</div> : <p className="helper-text">No assignments for this class.</p>}</div><div className="panel"><div className="section-heading"><div><span className="eyebrow">Complaints</span><h2>Recent requests</h2></div></div>{selectedStudent.complaints?.length ? <div className="list-stack">{selectedStudent.complaints.slice(0, 6).map((item) => <div className="list-row" key={item.id}><div><strong>{item.title}</strong><span>{item.category || "General"}</span></div><Badge value={item.status || "open"} /></div>)}</div> : <p className="helper-text">No complaints submitted.</p>}</div></section>
+          <section className="panel"><div className="section-heading"><div><span className="eyebrow">Internal assessment</span><h2>Marks</h2></div></div>{selectedStudent.marks?.length ? <div className="table-wrap compact-table"><table><thead><tr><th>Subject</th><th>Marks</th><th>Remarks</th></tr></thead><tbody>{selectedStudent.marks.map((item) => <tr key={item.id}><td>{item.subjectName}</td><td>{item.marks}/{item.maxMarks}</td><td>{item.remarks || "—"}</td></tr>)}</tbody></table></div> : <p className="helper-text">No internal marks recorded.</p>}</section>
+        </div>}
+      </Modal>
     </div>
   );
 }

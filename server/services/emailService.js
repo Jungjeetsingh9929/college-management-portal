@@ -59,3 +59,12 @@ export async function sendOtpEmail({ to, name, otp, purpose }) {
   const html = `<p>Hi ${escapeHtml(displayName)},</p><p>Use this one-time code to ${escapeHtml(label)}:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px">${escapeHtml(otp)}</p><p>This code expires in 10 minutes and can only be used once. If you did not request this, you can ignore this email.</p>`;
   return sendEmail({ to, subject, text, html, devLabel: `OTP (${purpose}): ${otp}` });
 }
+
+export async function sendFeeReminderEmail({ to, name, amount, dueDate }) {
+  const displayName = name ? String(name).slice(0, 120) : "there";
+  const subject = "College Portal fee payment reminder";
+  const formattedAmount = Number(amount || 0).toLocaleString("en-IN");
+  const text = `Hi ${displayName},\n\nYour outstanding college fee balance is ₹${formattedAmount}.${dueDate ? ` The due date is ${dueDate}.` : " Please contact the administration office for payment details."}\n`;
+  const html = `<p>Hi ${escapeHtml(displayName)},</p><p>Your outstanding college fee balance is <strong>₹${formattedAmount}</strong>${dueDate ? ` and the due date is <strong>${escapeHtml(dueDate)}</strong>` : ""}.</p><p>Please contact the administration office for payment details.</p>`;
+  return sendEmail({ to, subject, text, html, devLabel: `fee reminder for ₹${formattedAmount}` });
+}

@@ -10,6 +10,7 @@
     "server": "node server/index.js",
     "seed": "node server/scripts/seed.js",
     "test": "node tests/api.test.js",
+    "test:regression": "node tests/regression-flow.test.js",
     "build": "vite build"
   },
   "dependencies": {
