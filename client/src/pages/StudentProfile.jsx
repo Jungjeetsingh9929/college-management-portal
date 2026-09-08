@@ -1,10 +1,5 @@
-<<<<<<< HEAD
 import React, { useEffect, useState } from "react";
 import { ArrowRight, Mail, Phone, QrCode, UserRound, X } from "lucide-react";
-=======
-import React, { useState } from "react";
-import { Mail, Phone, UserRound } from "lucide-react";
->>>>>>> 78613d2d2ecc9f02e71d4658e00f2f6e7ccc4cdc
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { apiFetch } from "../context/api.js";
@@ -18,14 +13,11 @@ export function StudentProfile() {
   const [phone, setPhone] = useState(user.phone || "");
   const [guardian, setGuardian] = useState(user.guardian || "");
   const [saving, setSaving] = useState(false);
-<<<<<<< HEAD
   const [attendanceSession, setAttendanceSession] = useState(null);
   const [attendanceLoading, setAttendanceLoading] = useState(true);
   useEffect(() => {
     apiFetch("/shared/student/portal").then((data) => setAttendanceSession(data.liveQuizSessions?.[0] || null)).catch(() => {}).finally(() => setAttendanceLoading(false));
   }, []);
-=======
->>>>>>> 78613d2d2ecc9f02e71d4658e00f2f6e7ccc4cdc
   const details = [
     ["Roll number", user.rollNumber],
     ["Class", user.className],
@@ -37,10 +29,7 @@ export function StudentProfile() {
 
   return (
     <div className="page-stack">
-<<<<<<< HEAD
       {!attendanceLoading && attendanceSession && <div className="attendance-modal-backdrop" role="presentation"><section className="attendance-modal panel" role="dialog" aria-modal="true" aria-labelledby="attendance-session-title"><button type="button" className="icon-button attendance-modal-close" aria-label="Close attendance prompt" onClick={() => setAttendanceSession(null)}><X size={18} /></button><span className="eyebrow">Live attendance session</span><h2 id="attendance-session-title">{attendanceSession.title}</h2><p>{attendanceSession.teacherName} has started a question session for <strong>{attendanceSession.className}</strong>.</p><div className="attendance-qr-frame"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=12&data=${encodeURIComponent(`${window.location.origin}/student/quiz-session/${attendanceSession.id}`)}`} alt="QR code for the live attendance session" /><span>Scan on another device, or continue below.</span></div><div className="success-box"><strong>Campus check required.</strong> Answer the session question and allow location access. Attendance is recorded only when you are within the college geofence.</div><Link className="primary-button full" to={`/student/quiz-session/${attendanceSession.id}`} onClick={() => setAttendanceSession(null)}><QrCode size={16} /> Open attendance session <ArrowRight size={16} /></Link></section></div>}
-=======
->>>>>>> 78613d2d2ecc9f02e71d4658e00f2f6e7ccc4cdc
       <section className="profile-hero panel">
         <div className="avatar-lg">
           <UserRound size={42} />

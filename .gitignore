@@ -13,7 +13,6 @@ storage/
 *.zip
 coverage/
 .vite/
-<<<<<<< HEAD
 node_modules/
 dist/
 storage/
@@ -22,5 +21,3 @@ credential-groups.zip
 .env
 .env.*
 !.env.example
-=======
->>>>>>> 78613d2d2ecc9f02e71d4658e00f2f6e7ccc4cdc

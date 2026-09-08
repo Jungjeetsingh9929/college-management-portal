@@ -38,10 +38,7 @@ function buildNotifications(db, user) {
   const student = user.role === "student" ? (db.students || []).find((item) => item.id === user.id) : null;
   (db.notices || []).filter((item) => user.role === "admin" || (user.role === "teacher" && item.teacherId === user.id) || (student && (!item.className || item.className === student.className))).slice(0, 12).forEach((item) => push(`notice:${item.id}`, item.category === "emergency" ? "security" : "notice", item.title, item.body || "New notice published.", item.createdAt, "/complaints"));
   if (student) {
-<<<<<<< HEAD
     (db.quizSessions || []).filter((session) => session.active && session.className === student.className && new Date(session.endsAt).getTime() > Date.now()).slice(0, 8).forEach((session) => push(`quiz-session:${session.id}`, "attendance", "Attendance session started", `${session.teacherName || "Your faculty"} started ${session.title}. Answer the question on campus to mark attendance.`, session.startedAt, `/student/quiz-session/${session.id}`));
-=======
->>>>>>> 78613d2d2ecc9f02e71d4658e00f2f6e7ccc4cdc
     (db.assignments || []).filter((item) => item.className === student.className && !((db.assignmentCompletions || []).some((completion) => completion.assignmentId === item.id && completion.studentId === student.id))).slice(0, 8).forEach((item) => push(`assignment:${item.id}`, "assignment", `Assignment deadline: ${item.title}`, `Due ${item.dueDate}.`, item.createdAt, "/assignments"));
     const stats = calculateStudentStats(student.id, db.attendance || []); if (stats.total && stats.percentage < 75) push(`attendance:${student.id}`, "attendance", "Attendance warning", `Your attendance is ${stats.percentage}%.`, new Date().toISOString(), "/history");
     (db.examinations || []).filter((item) => !item.className || item.className === student.className).slice(0, 6).forEach((item) => push(`exam:${item.id}`, "exam", `Exam announcement: ${item.subject}`, `${item.date || "Date to be announced"}${item.room ? ` · Room ${item.room}` : ""}.`, item.createdAt || item.date, "/student"));
@@ -140,11 +137,7 @@ sharedRouter.get("/quiz-session/:id", requireAuth, async (req, res) => {
   if (!session.active || new Date(session.endsAt).getTime() <= Date.now()) return res.status(400).json({ message: "This question session has ended." });
   const attempts = new Set((db.quizAttempts || []).filter((attempt) => attempt.studentId === student.id).map((attempt) => attempt.quizId));
   const subject = (db.subjects || []).find((item) => item.id === session.subjectId);
-<<<<<<< HEAD
   const questions = (db.quizzes || []).filter((quiz) => quiz.sessionId === session.id && quiz.active).map((quiz) => ({ id: quiz.id, question: quiz.question, answerType: quiz.answerType || "choice", options: quiz.options || [], attempted: attempts.has(quiz.id) }));
-=======
-  const questions = (db.quizzes || []).filter((quiz) => quiz.sessionId === session.id && quiz.active).map((quiz) => ({ id: quiz.id, question: quiz.question, options: quiz.options, attempted: attempts.has(quiz.id) }));
->>>>>>> 78613d2d2ecc9f02e71d4658e00f2f6e7ccc4cdc
   res.json({ session: { id: session.id, title: session.title, className: session.className, teacherName: session.teacherName, subjectName: subject?.subjectName || "Subject", startedAt: session.startedAt, endsAt: session.endsAt, questions } });
 });
 
@@ -389,11 +382,8 @@ sharedRouter.get("/quiz/:id", requireAuth, async (req, res) => {
   
   if (!quiz) return res.status(404).json({ message: "Quiz not found." });
   if (!quiz.active) return res.status(400).json({ message: "Quiz is no longer active." });
-<<<<<<< HEAD
   const session = quiz.sessionId ? (db.quizSessions || []).find((item) => item.id === quiz.sessionId) : null;
   if (session && (!session.active || new Date(session.endsAt).getTime() <= Date.now())) return res.status(400).json({ message: "This attendance session has ended." });
-=======
->>>>>>> 78613d2d2ecc9f02e71d4658e00f2f6e7ccc4cdc
   
   const subject = (db.subjects || []).find(s => s.id === quiz.subjectId);
   const student = req.user.role === "student"
@@ -408,12 +398,8 @@ sharedRouter.get("/quiz/:id", requireAuth, async (req, res) => {
   const safeQuiz = {
     id: quiz.id,
     question: quiz.question,
-<<<<<<< HEAD
     answerType: quiz.answerType || "choice",
     options: quiz.options || [],
-=======
-    options: quiz.options,
->>>>>>> 78613d2d2ecc9f02e71d4658e00f2f6e7ccc4cdc
     className: quiz.className,
     subjectName: subject ? subject.subjectName : "Unknown Subject",
     attempted
@@ -456,11 +442,8 @@ sharedRouter.post("/student/quiz/:id/answer", requireAuth, rateLimit({
   const quiz = db.quizzes.find(q => q.id === req.params.id);
   if (!quiz) return res.status(404).json({ message: "Quiz not found." });
   if (!quiz.active) return res.status(400).json({ message: "Quiz is no longer active." });
-<<<<<<< HEAD
   const session = quiz.sessionId ? (db.quizSessions || []).find((item) => item.id === quiz.sessionId) : null;
   if (session && (!session.active || new Date(session.endsAt).getTime() <= Date.now())) return res.status(400).json({ message: "This attendance session has ended." });
-=======
->>>>>>> 78613d2d2ecc9f02e71d4658e00f2f6e7ccc4cdc
   
   const student = db.students.find(s => s.id === req.user.id);
   if (!student) return res.status(404).json({ message: "Student not found." });
@@ -477,19 +460,11 @@ sharedRouter.post("/student/quiz/:id/answer", requireAuth, rateLimit({
     });
   }
 
-<<<<<<< HEAD
   const answerType = quiz.answerType || "choice";
   const answerText = String(req.body?.answerText || "").trim();
   const parsedAnswerIndex = answerType === "written" ? null : parseAnswerIndex(req.body?.answerIndex, (quiz.options || []).length);
   if (answerType === "written" && (!answerText || answerText.length > 2000)) return res.status(400).json({ message: "Write an answer between 1 and 2000 characters." });
   if (answerType !== "written" && parsedAnswerIndex === null) return res.status(400).json({ message: "Answer index must point to a valid option." });
-=======
-  const { answerIndex } = req.body;
-  const parsedAnswerIndex = parseAnswerIndex(answerIndex, quiz.options.length);
-  if (parsedAnswerIndex === null) {
-    return res.status(400).json({ message: "Answer index must point to a valid option." });
-  }
->>>>>>> 78613d2d2ecc9f02e71d4658e00f2f6e7ccc4cdc
   const previousAttempt = db.quizAttempts.find(
     (attempt) => attempt.quizId === quiz.id && attempt.studentId === student.id
   );
@@ -497,21 +472,14 @@ sharedRouter.post("/student/quiz/:id/answer", requireAuth, rateLimit({
     return res.status(409).json({ message: "You have already submitted an answer for this quiz." });
   }
 
-<<<<<<< HEAD
   const isCorrect = answerType === "written" ? true : parsedAnswerIndex === quiz.correctAnswerIndex;
-=======
-  const isCorrect = parsedAnswerIndex === quiz.correctAnswerIndex;
->>>>>>> 78613d2d2ecc9f02e71d4658e00f2f6e7ccc4cdc
   db.quizAttempts.push({
     id: makeId("attempt"),
     quizId: quiz.id,
     studentId: student.id,
     answerIndex: parsedAnswerIndex,
-<<<<<<< HEAD
     answerText: answerType === "written" ? answerText : undefined,
     answerType,
-=======
->>>>>>> 78613d2d2ecc9f02e71d4658e00f2f6e7ccc4cdc
     correct: isCorrect,
     createdAt: new Date().toISOString()
   });
@@ -535,14 +503,10 @@ sharedRouter.post("/student/quiz/:id/answer", requireAuth, rateLimit({
       date,
       status: "present",
       time,
-<<<<<<< HEAD
       method: "quiz-geofence",
       sessionId: quiz.sessionId || null,
       locationVerified: true,
       location: { latitude: lat, longitude: lng, accuracy: Number(accuracy) || null, distance, radiusMeters }
-=======
-      method: "quiz"
->>>>>>> 78613d2d2ecc9f02e71d4658e00f2f6e7ccc4cdc
     };
     db.attendance.push(attendanceRecord);
     await writeDb(db);
