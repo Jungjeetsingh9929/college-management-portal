@@ -1,0 +1,11 @@
+const db = require('./server/db/database.json');
+const fs = require('fs');
+let out = '';
+out += '=== ADMINS (password: Admin@Pass123) ===\n';
+db.admins.forEach(a => out += a.email + ' - ' + a.name + '\n');
+out += '\n=== TEACHERS (password: Faculty@Pass123) ===\n';
+db.teachers.forEach(t => out += t.email + ' - ' + t.name + ' (' + t.department + ')\n');
+out += '\n=== STUDENTS (password: Student@Pass123) ===\n';
+db.students.forEach(s => out += s.email + ' - ' + s.name + ' (' + s.className + ')\n');
+fs.writeFileSync('all-credentials.txt', out);
+console.log('Written to all-credentials.txt');

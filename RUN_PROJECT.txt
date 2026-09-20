@@ -1,0 +1,50 @@
+College Management Portal - Local Run Guide
+
+1. Open the project folder:
+
+   cd college-management-portal
+
+2. Install dependencies:
+
+   npm install
+
+3. Create local environment file:
+
+   cp .env.example .env
+
+4. Start backend in terminal 1:
+
+   npm run server
+
+5. Start frontend in terminal 2:
+
+   npm run client
+
+6. Open website:
+
+   http://localhost:5175/
+
+7. Demo admin login:
+
+   Email: value from SEED_ADMIN_EMAIL in your local .env
+   Password: value from SEED_ADMIN_PASSWORD in your local .env
+
+8. Demo student login:
+
+   Email: one of the seeded demo student emails
+   Password: value from SEED_STUDENT_PASSWORD in your local .env
+
+For phone testing, connect phone and laptop to the same Wi-Fi and open:
+
+   http://<laptop-ip>:5175/
+
+Public deployment note:
+
+   Deploy the frontend and backend to a 24/7 host such as Render, Railway,
+   Fly.io, or a VPS.
+
+   Build command: npm install && npm run build
+   Start command: npm start
+
+   Set production secrets and runtime values in the hosting dashboard. The
+   included render.yaml can be used on Render.
