@@ -14,6 +14,9 @@ import { extensionForMimetype, hasValidFileSignature, uploadFileFilter } from ".
 export const facultyRouter = Router();
 const quizCreateConfig = rateConfig("FACULTY_QUIZ_CREATE", { windowMs: 5 * 60 * 1000, limit: 30 });
 const facultyUploadRoot = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), "storage", "faculty-notes"));
+// Same path shared.js resolves for its attachment-download route — keep
+// these two constants in sync since they must point at the same folder.
+const assignmentAttachmentRoot = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), "storage", "assignment-attachments"));
 const noteUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: Number(process.env.SUBMISSION_MAX_BYTES) || 5 * 1024 * 1024 }, fileFilter: uploadFileFilter });
 function teacherScope(db, user) { const classes = classesTaughtByTeacher(db, user.code); return { classes, subjects: (db.subjects || []).filter((subject) => classes.includes(subject.className) && subjectBelongsToTeacher(subject, user.code)), students: (db.students || []).filter((student) => classes.includes(student.className)) }; }
 
@@ -177,6 +180,47 @@ facultyRouter.delete("/assignments/:id", requireAuth, requireTeacher, async (req
   res.json({ ok: true });
 });
 
+const MAX_ASSIGNMENT_ATTACHMENTS = 5;
+
+// Reference material the teacher posts alongside the assignment (a question
+// paper, a rubric, sample data, etc.) — separate from what students submit.
+facultyRouter.post("/assignments/:id/attachments", requireAuth, requireTeacher, (req, res, next) => noteUpload.array("files", MAX_ASSIGNMENT_ATTACHMENTS)(req, res, (error) => {
+  if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") return res.status(413).json({ message: "One of the attachment files is too large." });
+  if (error instanceof multer.MulterError && error.code === "LIMIT_UNEXPECTED_FILE") return res.status(400).json({ message: `You can attach at most ${MAX_ASSIGNMENT_ATTACHMENTS} files.` });
+  if (error || !req.files || req.files.length === 0) return res.status(400).json({ message: "Attach one or more PDF, PNG, or JPEG files." });
+  next();
+}), async (req, res) => {
+  for (const file of req.files) {
+    if (!hasValidFileSignature(file)) return res.status(400).json({ message: "One of the uploaded files does not match its declared type." });
+  }
+  const db = await readDb();
+  db.assignments ||= [];
+  const assignment = db.assignments.find((item) => item.id === req.params.id && item.teacherId === req.user.id);
+  if (!assignment) return res.status(404).json({ message: "Assignment not found." });
+  assignment.attachments ||= [];
+  if (assignment.attachments.length + req.files.length > MAX_ASSIGNMENT_ATTACHMENTS) {
+    return res.status(409).json({ message: `You can attach at most ${MAX_ASSIGNMENT_ATTACHMENTS} reference files per assignment.` });
+  }
+  for (const file of req.files) {
+    const extension = extensionForMimetype(file.mimetype);
+    const storedName = `${crypto.randomUUID()}.${extension}`;
+    await saveFile({ storedName, buffer: file.buffer, localDir: assignmentAttachmentRoot });
+    assignment.attachments.push({ id: makeId("att"), name: file.originalname.slice(0, 120), type: file.mimetype, size: file.size, storedName });
+  }
+  await writeDb(db);
+  res.status(201).json({ assignment });
+});
+
+facultyRouter.delete("/assignments/:id/attachments/:attachmentId", requireAuth, requireTeacher, async (req, res) => {
+  const db = await readDb();
+  db.assignments ||= [];
+  const assignment = db.assignments.find((item) => item.id === req.params.id && item.teacherId === req.user.id);
+  if (!assignment) return res.status(404).json({ message: "Assignment not found." });
+  assignment.attachments = (assignment.attachments || []).filter((item) => item.id !== req.params.attachmentId);
+  await writeDb(db);
+  res.json({ assignment });
+});
+
 facultyRouter.get("/assignments/:id/submissions", requireAuth, requireTeacher, async (req, res) => {
   const db = await readDb();
   db.assignments ||= [];
@@ -198,7 +242,7 @@ facultyRouter.get("/assignments/:id/submissions", requireAuth, requireTeacher, a
       completedAt: completion ? completion.completedAt : null,
       submissionText: completion ? completion.submissionText : null,
       submissionLink: completion ? completion.submissionLink : null,
-      submissionFile: completion ? completion.submissionFile : null,
+      submissionFiles: completion ? (completion.submissionFiles || []) : [],
       marks: completion?.marks ?? null,
       maxMarks: completion?.maxMarks ?? null,
       feedback: completion?.feedback || "",

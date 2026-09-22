@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { CheckCircle2, ClipboardList } from "lucide-react";
+import { CheckCircle2, ClipboardList, Paperclip } from "lucide-react";
 import { Badge, EmptyState } from "../components/UI.jsx";
 import { apiFetch, downloadToFile } from "../context/api.js";
 import { groupAssignmentsByStatus } from "../utils/assignments.js";
@@ -10,11 +10,13 @@ const GROUP_META = [
   { key: "upcoming", label: "Upcoming" }
 ];
 
+const MAX_FILES = 5;
+
 function AssignmentRow({ assignment, onToggle, onUpload, busy }) {
   const [expanded, setExpanded] = useState(false);
   const [submissionText, setSubmissionText] = useState(assignment.submissionText || "");
   const [submissionLink, setSubmissionLink] = useState(assignment.submissionLink || "");
-  const [file, setFile] = useState(null);
+  const [files, setFiles] = useState([]);
 
   useEffect(() => {
     if (assignment.completed) setExpanded(true);
@@ -25,22 +27,25 @@ function AssignmentRow({ assignment, onToggle, onUpload, busy }) {
     onToggle(assignment, { submissionText, submissionLink });
   };
 
-  // Once a file has been submitted it's treated as final, and nothing can be
-  // changed after the deadline — mirrors the server-side enforcement so the
-  // UI shows a clear disabled state instead of only surfacing a failed request.
-  const isFinalized = Boolean(assignment.submissionFile);
-  const isOverdue = assignment.status === "overdue" && !assignment.completed;
-  const locked = isFinalized || (assignment.status === "overdue");
-  const lockMessage = isFinalized
-    ? "Already submitted — contact your teacher if you need to resubmit."
-    : assignment.status === "overdue"
-      ? "The deadline has passed — you can no longer submit or make changes."
+  const submittedFiles = assignment.submissionFiles || [];
+  const isGraded = Boolean(assignment.evaluatedAt);
+  // A file submission is treated as final, and a graded submission is
+  // locked too — mirrors "returned" work in Google Classroom. Note the
+  // deadline itself no longer locks anything: turning work in late is
+  // allowed, it's just marked "late" via assignment.status.
+  const isFinalized = submittedFiles.length > 0;
+  const locked = isGraded || isFinalized;
+  const canAddMoreFiles = !isGraded && submittedFiles.length < MAX_FILES;
+  const lockMessage = isGraded
+    ? "This assignment has been graded — contact your teacher if you need to resubmit."
+    : isFinalized
+      ? "Already submitted — contact your teacher if you need to resubmit."
       : "";
 
   return (
     <div className={`list-row assignment-row${assignment.completed ? " is-completed" : ""}`} style={{ flexDirection: "column", alignItems: "stretch", gap: "8px" }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", width: "100%" }}>
-        <label className="assignment-checkbox" title={isOverdue ? "The deadline has passed" : undefined}>
+        <label className="assignment-checkbox">
           <input
             type="checkbox"
             checked={assignment.completed}
@@ -50,18 +55,42 @@ function AssignmentRow({ assignment, onToggle, onUpload, busy }) {
         </label>
         <div style={{ flex: 1 }}>
           <strong>{assignment.title}</strong>
-          <span>{assignment.className} · {assignment.teacherName} · Due: {assignment.dueDate}</span>
+          <span>{assignment.className} · {assignment.teacherName} · Due: {new Date(assignment.dueDate).toLocaleString()}</span>
           {assignment.description && (
             <p style={{ margin: "6px 0 0", fontSize: "0.9rem", color: "var(--muted)" }}>{assignment.description}</p>
           )}
-          {isOverdue && <p className="helper-text" style={{ color: "var(--danger, #d64545)", margin: "4px 0 0" }}>Deadline passed — this assignment can no longer be submitted.</p>}
+          {assignment.attachments?.length > 0 && (
+            <div style={{ margin: "6px 0 0", display: "flex", flexWrap: "wrap", gap: "10px" }}>
+              {assignment.attachments.map((att) => (
+                <button
+                  key={att.id}
+                  type="button"
+                  className="link-button"
+                  onClick={() => downloadToFile(`/shared/assignments/${assignment.id}/attachments/${att.id}`, att.name)}
+                >
+                  <Paperclip size={12} style={{ verticalAlign: "middle", marginRight: "4px" }} />{att.name}
+                </button>
+              ))}
+            </div>
+          )}
+          {assignment.status === "overdue" && !assignment.completed && (
+            <p className="helper-text" style={{ color: "var(--danger, #d64545)", margin: "4px 0 0" }}>
+              Deadline passed — you can still submit, but it will be marked late.
+            </p>
+          )}
+          {isGraded && (
+            <p className="helper-text" style={{ margin: "4px 0 0" }}>
+              Grade: <strong>{assignment.marks} / {assignment.maxMarks}</strong>
+              {assignment.feedback ? ` · ${assignment.feedback}` : ""}
+            </p>
+          )}
         </div>
         <Badge value={assignment.status} />
       </div>
-      
+
       {expanded && assignment.completed && (
         <div className="form-stack" style={{ marginLeft: "32px", padding: "12px", background: "var(--surface)", borderRadius: "6px", marginTop: "4px" }}>
-          {locked && <div className="helper-text" style={{ color: "var(--danger, #d64545)" }}>{lockMessage}</div>}
+          {lockMessage && <div className="helper-text" style={{ color: "var(--danger, #d64545)" }}>{lockMessage}</div>}
           <label style={{ fontSize: "0.85rem" }}>
             Submission Note (optional)
             <textarea
@@ -84,21 +113,53 @@ function AssignmentRow({ assignment, onToggle, onUpload, busy }) {
               disabled={locked}
             />
           </label>
-          <label style={{ fontSize: "0.85rem" }}>
-            Upload submission (PDF, PNG, or JPEG; max 5 MB)
-            <input type="file" accept="application/pdf,image/png,image/jpeg" onChange={(e) => setFile(e.target.files?.[0] || null)} disabled={locked} />
-          </label>
-          <button 
-            type="button" 
-            className="secondary-button" 
-            style={{ alignSelf: "flex-start", marginTop: "4px" }} 
+          {canAddMoreFiles && (
+            <label style={{ fontSize: "0.85rem" }}>
+              Attach files (PDF, PNG, or JPEG; up to {MAX_FILES - submittedFiles.length} more, 5 MB each)
+              <input
+                type="file"
+                accept="application/pdf,image/png,image/jpeg"
+                multiple
+                onChange={(e) => setFiles(Array.from(e.target.files || []).slice(0, MAX_FILES - submittedFiles.length))}
+              />
+            </label>
+          )}
+          <button
+            type="button"
+            className="secondary-button"
+            style={{ alignSelf: "flex-start", marginTop: "4px" }}
             onClick={handleSave}
             disabled={busy || locked}
           >
             Save Submission
           </button>
-          {file && <button type="button" className="secondary-button" style={{ alignSelf: "flex-start" }} onClick={() => onUpload(assignment, file)} disabled={busy || locked}>Upload file</button>}
-          {assignment.submissionFile && <span className="helper-text">Submitted file: {assignment.submissionFile.name} · <button type="button" className="link-button" onClick={() => downloadToFile(`/shared/student/assignments/${assignment.id}/submission/file`, assignment.submissionFile.name)}>Download</button></span>}
+          {files.length > 0 && (
+            <button
+              type="button"
+              className="secondary-button"
+              style={{ alignSelf: "flex-start" }}
+              onClick={() => onUpload(assignment, files)}
+              disabled={busy || locked}
+            >
+              Upload {files.length} file{files.length > 1 ? "s" : ""}
+            </button>
+          )}
+          {submittedFiles.length > 0 && (
+            <div className="helper-text" style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              {submittedFiles.map((file) => (
+                <span key={file.storedName}>
+                  Submitted: {file.name} ·{" "}
+                  <button
+                    type="button"
+                    className="link-button"
+                    onClick={() => downloadToFile(`/shared/student/assignments/${assignment.id}/submission/file/${file.storedName}`, file.name)}
+                  >
+                    Download
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -145,12 +206,12 @@ export function StudentAssignments() {
     }
   }
 
-  async function handleUpload(assignment, file) {
+  async function handleUpload(assignment, files) {
     setBusyId(assignment.id);
     setError("");
     try {
       const body = new FormData();
-      body.append("file", file);
+      for (const file of files) body.append("files", file);
       await apiFetch(`/shared/student/assignments/${assignment.id}/submission`, { method: "POST", body });
       await loadAssignments();
     } catch (err) {

@@ -495,7 +495,8 @@ try {
   });
   assert.equal(badAdminRes.response.status, 403);
 
-  // Overdue assignments must reject completion/edits/withdrawal outright.
+  // Late assignments no longer reject completion outright — a turn-in past
+  // the deadline is still accepted, just flagged "late" instead of "completed".
   const dateOverdue = new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
   const assignmentOverdue = await json("/faculty/assignments", {
     method: "POST",
@@ -506,31 +507,40 @@ try {
     method: "POST",
     headers: { Authorization: `Bearer ${student.token}` }
   });
-  assert.equal(overdueCompleteRes.response.status, 403);
-  assert.match(overdueCompleteRes.data.message, /deadline/i);
+  assert.equal(overdueCompleteRes.response.status, 200);
+  const overdueAssignments = await json("/shared/student/assignments", {
+    headers: { Authorization: `Bearer ${student.token}` }
+  });
+  const lateAssignment = overdueAssignments.assignments.find(a => a.id === assignmentOverdue.assignment.id);
+  assert.equal(lateAssignment.status, "late");
 
-  // Once a file submission exists, further edits/uploads/withdrawals are locked.
+  // A student can attach multiple files to one submission (up to the cap).
   await json(`/shared/student/assignments/${assignmentToday.assignment.id}/complete`, {
     method: "POST",
     headers: { Authorization: `Bearer ${student.token}` },
     body: JSON.stringify({ submissionText: "First pass" })
   });
   const submissionForm = new FormData();
-  submissionForm.append("file", new Blob([Buffer.from("%PDF-1.4 test")], { type: "application/pdf" }), "work.pdf");
+  submissionForm.append("files", new Blob([Buffer.from("%PDF-1.4 test")], { type: "application/pdf" }), "work.pdf");
   const uploadRes = await request(`/shared/student/assignments/${assignmentToday.assignment.id}/submission`, {
     method: "POST",
     headers: { Authorization: `Bearer ${student.token}` },
     body: submissionForm
   });
   assert.equal(uploadRes.response.status, 200);
+  assert.equal(uploadRes.data.submissionFiles.length, 1);
 
-  const duplicateUploadRes = await request(`/shared/student/assignments/${assignmentToday.assignment.id}/submission`, {
+  const secondForm = new FormData();
+  secondForm.append("files", new Blob([Buffer.from("%PDF-1.4 test 2")], { type: "application/pdf" }), "work2.pdf");
+  const secondUploadRes = await request(`/shared/student/assignments/${assignmentToday.assignment.id}/submission`, {
     method: "POST",
     headers: { Authorization: `Bearer ${student.token}` },
-    body: submissionForm
+    body: secondForm
   });
-  assert.equal(duplicateUploadRes.response.status, 409);
+  assert.equal(secondUploadRes.response.status, 200);
+  assert.equal(secondUploadRes.data.submissionFiles.length, 2);
 
+  // Once a file submission exists, text/link edits and withdrawal are locked.
   const editAfterSubmitRes = await request(`/shared/student/assignments/${assignmentToday.assignment.id}/complete`, {
     method: "POST",
     headers: { Authorization: `Bearer ${student.token}` },
@@ -543,6 +553,19 @@ try {
     headers: { Authorization: `Bearer ${student.token}` }
   });
   assert.equal(withdrawAfterSubmitRes.response.status, 409);
+
+  // Exceeding the 5-file cap in total (2 already submitted + 4 more) is rejected.
+  const overflowForm = new FormData();
+  overflowForm.append("files", new Blob([Buffer.from("%PDF-1.4 a")], { type: "application/pdf" }), "a.pdf");
+  overflowForm.append("files", new Blob([Buffer.from("%PDF-1.4 b")], { type: "application/pdf" }), "b.pdf");
+  overflowForm.append("files", new Blob([Buffer.from("%PDF-1.4 c")], { type: "application/pdf" }), "c.pdf");
+  overflowForm.append("files", new Blob([Buffer.from("%PDF-1.4 d")], { type: "application/pdf" }), "d.pdf");
+  const overflowRes = await request(`/shared/student/assignments/${assignmentToday.assignment.id}/submission`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${student.token}` },
+    body: overflowForm
+  });
+  assert.equal(overflowRes.response.status, 409);
 
   // Teacher list must never leak password hashes, and must be staff-only.
   const studentTeachersRes = await request("/teachers", {

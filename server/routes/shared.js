@@ -18,6 +18,9 @@ import { extensionForMimetype, hasValidFileSignature, uploadFileFilter } from ".
 export const sharedRouter = Router();
 const uploadRoot = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), "storage", "submissions"));
 const facultyUploadRoot = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), "storage", "faculty-notes"));
+// Reference material a teacher attaches to an assignment (not a submission).
+// Kept in its own folder so it's never confused with student submissions.
+const assignmentAttachmentRoot = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), "storage", "assignment-attachments"));
 const submissionUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: Number(process.env.SUBMISSION_MAX_BYTES) || 5 * 1024 * 1024 },
@@ -35,9 +38,28 @@ function noticeVisibleToStudent(item, student) {
   return true;
 }
 
+// Shared shape for how a single assignment looks from a student's point of
+// view, whether it's rendered on the dashboard overview or the dedicated
+// assignments page — includes their submission (text/link/files) and, once
+// graded, their marks/feedback.
+function studentAssignmentView(assignment, completion) {
+  return {
+    ...assignment,
+    completed: Boolean(completion),
+    submissionText: completion?.submissionText || "",
+    submissionLink: completion?.submissionLink || "",
+    submissionFiles: completion?.submissionFiles || [],
+    marks: completion?.marks ?? null,
+    maxMarks: completion?.maxMarks ?? null,
+    feedback: completion?.feedback || "",
+    evaluatedAt: completion?.evaluatedAt || null,
+    status: computeAssignmentStatus(assignment.dueDate, completion)
+  };
+}
+
 function publicAssignment(db, assignment, studentId) {
   const completion = (db.assignmentCompletions || []).find((item) => item.assignmentId === assignment.id && item.studentId === studentId);
-  return { ...assignment, completed: Boolean(completion), submissionText: completion?.submissionText || "", submissionLink: completion?.submissionLink || "", submissionFile: completion?.submissionFile || null, status: computeAssignmentStatus(assignment.dueDate, Boolean(completion)) };
+  return studentAssignmentView(assignment, completion);
 }
 
 function buildNotifications(db, user) {
@@ -247,30 +269,48 @@ sharedRouter.get("/notes/:id/file", requireAuth, async (req, res) => {
   res.attachment(note.file.name || "note");
   res.send(buffer);
 });
-// Compute an urgency status for an assignment relative to today, factoring in completion.
-function computeAssignmentStatus(dueDate, completed) {
-  if (completed) return "completed";
+// Download a teacher-provided assignment attachment (reference material,
+// not a submission). Available to: the teacher who owns the assignment, an
+// admin, or any student in the class the assignment was posted to.
+sharedRouter.get("/assignments/:id/attachments/:attachmentId", requireAuth, async (req, res) => {
+  const db = await readDb();
+  const assignment = (db.assignments || []).find((item) => item.id === req.params.id);
+  if (!assignment) return res.status(404).json({ message: "Assignment not found." });
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const allowed =
+    req.user.role === "admin" ||
+    (req.user.role === "teacher" && assignment.teacherId === req.user.id) ||
+    (req.user.role === "student" && (db.students || []).some((item) => item.id === req.user.id && item.className === assignment.className));
+  if (!allowed) return res.status(403).json({ message: "You do not have access to this file." });
 
+  const attachment = (assignment.attachments || []).find((item) => item.id === req.params.attachmentId);
+  if (!attachment) return res.status(404).json({ message: "Attachment not found." });
+
+  const buffer = await loadFile({ storedName: attachment.storedName, localDir: assignmentAttachmentRoot });
+  if (!buffer) return res.status(404).json({ message: "File not found." });
+  res.set("Content-Type", attachment.type || "application/octet-stream");
+  res.attachment(attachment.name || "attachment");
+  res.send(buffer);
+});
+
+// Compute an urgency status for an assignment relative to now, factoring in
+// completion. dueDate can be a plain date ("2026-05-01", treated as
+// end-of-day) or a full datetime ("2026-05-01T23:59"). Submissions are never
+// blocked past the deadline — a late turn-in is simply marked "late" instead
+// of "completed", mirroring Google Classroom rather than locking students out.
+function computeAssignmentStatus(dueDate, completion) {
   const due = new Date(dueDate);
-  due.setHours(0, 0, 0, 0);
+  if (!/T\d/.test(String(dueDate))) due.setHours(23, 59, 59, 999);
+
+  if (completion) {
+    return new Date(completion.completedAt).getTime() > due.getTime() ? "late" : "completed";
+  }
 
   const msPerDay = 24 * 60 * 60 * 1000;
-  const daysUntilDue = Math.round((due.getTime() - today.getTime()) / msPerDay);
-
-  if (daysUntilDue < 0) return "overdue";
-  if (daysUntilDue <= 3) return "due-soon";
+  const diffMs = due.getTime() - Date.now();
+  if (diffMs < 0) return "overdue";
+  if (diffMs <= 3 * msPerDay) return "due-soon";
   return "upcoming";
-}
-
-// An assignment is only "past deadline" once the full due date has elapsed,
-// i.e. after 23:59:59 on the due date, not from midnight of that same day.
-function isPastDeadline(dueDate) {
-  const due = new Date(dueDate);
-  due.setHours(23, 59, 59, 999);
-  return Date.now() > due.getTime();
 }
 
 // 2. Student route: Get assignments for their class
@@ -291,14 +331,7 @@ sharedRouter.get("/student/assignments", requireAuth, async (req, res) => {
       const completion = db.assignmentCompletions.find(
         (c) => c.assignmentId === a.id && c.studentId === student.id
       );
-      const completed = !!completion;
-      return {
-        ...a,
-        completed,
-        submissionText: completion ? completion.submissionText : "",
-        submissionLink: completion ? completion.submissionLink : "",
-        status: computeAssignmentStatus(a.dueDate, completed)
-      };
+      return studentAssignmentView(a, completion);
     });
 
   res.json({ assignments });
@@ -334,11 +367,15 @@ sharedRouter.post("/student/assignments/:id/complete", requireAuth, completeRate
 
   // A file submission is treated as final: once one exists, further changes
   // (including text/link edits) must go through the teacher, not this route.
-  if (existing?.submissionFile) {
-    return res.status(409).json({ message: "You have already submitted this assignment and cannot make further changes. Contact your teacher if you need to resubmit." });
+  // Once graded, the submission is locked too, mirroring a "returned" item
+  // in Google Classroom. Note there is no deadline check here any more: a
+  // student can still turn work in after the due date — computeAssignmentStatus
+  // marks it "late" rather than the route blocking it outright.
+  if (existing?.submissionFiles?.length) {
+    return res.status(409).json({ message: "You have already submitted file(s) for this assignment and cannot make further changes. Contact your teacher if you need to resubmit." });
   }
-  if (isPastDeadline(assignment.dueDate)) {
-    return res.status(403).json({ message: "The deadline for this assignment has passed. You can no longer submit or make changes." });
+  if (existing?.evaluatedAt) {
+    return res.status(409).json({ message: "This assignment has already been graded. Contact your teacher if you need to resubmit." });
   }
 
   const { submissionText, submissionLink } = req.body || {};
@@ -385,15 +422,23 @@ sharedRouter.post("/student/assignments/:id/complete", requireAuth, completeRate
   res.json({ completed: true });
 });
 
+const MAX_SUBMISSION_FILES = 5;
+
+// Accepts one or more files per request; a student can call this endpoint
+// again later to add more, up to MAX_SUBMISSION_FILES total (mirrors Google
+// Classroom's "Add or create" attachment list rather than a single file).
 sharedRouter.post("/student/assignments/:id/submission", requireAuth, completeRateLimit, (req, res, next) => {
-  submissionUpload.single("file")(req, res, (error) => {
-    if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") return res.status(413).json({ message: "Submission file is too large." });
-    if (error || !req.file) return res.status(400).json({ message: "Submit one PDF, PNG, or JPEG file." });
+  submissionUpload.array("files", MAX_SUBMISSION_FILES)(req, res, (error) => {
+    if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") return res.status(413).json({ message: "One of the submission files is too large." });
+    if (error instanceof multer.MulterError && error.code === "LIMIT_UNEXPECTED_FILE") return res.status(400).json({ message: `You can attach at most ${MAX_SUBMISSION_FILES} files.` });
+    if (error || !req.files || req.files.length === 0) return res.status(400).json({ message: "Submit one or more PDF, PNG, or JPEG files." });
     next();
   });
 }, async (req, res) => {
   if (req.user.role !== "student") return res.status(403).json({ message: "Student access required." });
-  if (!hasValidFileSignature(req.file)) return res.status(400).json({ message: "The uploaded file content does not match its declared type." });
+  for (const file of req.files) {
+    if (!hasValidFileSignature(file)) return res.status(400).json({ message: "One of the uploaded files does not match its declared type." });
+  }
   const db = await readDb();
   db.assignments ||= [];
   db.assignmentCompletions ||= [];
@@ -402,27 +447,33 @@ sharedRouter.post("/student/assignments/:id/submission", requireAuth, completeRa
   if (!student || !assignment) return res.status(404).json({ message: "Assignment not found." });
 
   const existing = db.assignmentCompletions.find((item) => item.assignmentId === assignment.id && item.studentId === student.id);
-  if (existing?.submissionFile) {
-    return res.status(409).json({ message: "You have already submitted a file for this assignment. Contact your teacher if you need to resubmit." });
+  if (existing?.evaluatedAt) {
+    return res.status(409).json({ message: "This assignment has already been graded. Contact your teacher if you need to resubmit." });
   }
-  if (isPastDeadline(assignment.dueDate)) {
-    return res.status(403).json({ message: "The deadline for this assignment has passed. You can no longer submit a file." });
+  const existingFiles = existing?.submissionFiles || [];
+  if (existingFiles.length + req.files.length > MAX_SUBMISSION_FILES) {
+    return res.status(409).json({ message: `You can attach at most ${MAX_SUBMISSION_FILES} files in total.` });
   }
 
-  const extension = extensionForMimetype(req.file.mimetype);
-  const storedName = `${crypto.randomUUID()}.${extension}`;
-  await saveFile({ storedName, buffer: req.file.buffer, localDir: uploadRoot });
-  const completion = existing || { id: makeId("cmp"), assignmentId: assignment.id, studentId: student.id };
+  const savedFiles = [];
+  for (const file of req.files) {
+    const extension = extensionForMimetype(file.mimetype);
+    const storedName = `${crypto.randomUUID()}.${extension}`;
+    await saveFile({ storedName, buffer: file.buffer, localDir: uploadRoot });
+    savedFiles.push({ name: file.originalname.slice(0, 120), type: file.mimetype, size: file.size, storedName });
+  }
+
+  const completion = existing || { id: makeId("cmp"), assignmentId: assignment.id, studentId: student.id, submissionText: "", submissionLink: "" };
   completion.completedAt = new Date().toISOString();
-  completion.submissionFile = { name: req.file.originalname.slice(0, 120), type: req.file.mimetype, size: req.file.size, storedName };
+  completion.submissionFiles = [...existingFiles, ...savedFiles];
   if (!existing) db.assignmentCompletions.push(completion);
   await writeDb(db);
-  res.json({ completed: true, submissionFile: completion.submissionFile });
+  res.json({ completed: true, submissionFiles: completion.submissionFiles });
 });
 
-// Download a submission file. Available to: the student who submitted it,
-// the teacher who owns the assignment, or an admin.
-sharedRouter.get("/student/assignments/:id/submission/file", requireAuth, async (req, res) => {
+// Download one submission file by its stored name. Available to: the
+// student who submitted it, the teacher who owns the assignment, or an admin.
+sharedRouter.get("/student/assignments/:id/submission/file/:storedName", requireAuth, async (req, res) => {
   const db = await readDb();
   const assignment = (db.assignments || []).find((item) => item.id === req.params.id);
   if (!assignment) return res.status(404).json({ message: "Assignment not found." });
@@ -437,12 +488,13 @@ sharedRouter.get("/student/assignments/:id/submission/file", requireAuth, async 
   if (!allowed) return res.status(403).json({ message: "You do not have access to this file." });
 
   const completion = (db.assignmentCompletions || []).find((item) => item.assignmentId === assignment.id && item.studentId === targetStudentId);
-  if (!completion?.submissionFile) return res.status(404).json({ message: "No submission file found." });
+  const submissionFile = completion?.submissionFiles?.find((file) => file.storedName === req.params.storedName);
+  if (!submissionFile) return res.status(404).json({ message: "No submission file found." });
 
-  const buffer = await loadFile({ storedName: completion.submissionFile.storedName, localDir: uploadRoot });
+  const buffer = await loadFile({ storedName: submissionFile.storedName, localDir: uploadRoot });
   if (!buffer) return res.status(404).json({ message: "File not found." });
-  res.set("Content-Type", completion.submissionFile.type || "application/octet-stream");
-  res.attachment(completion.submissionFile.name || "submission");
+  res.set("Content-Type", submissionFile.type || "application/octet-stream");
+  res.attachment(submissionFile.name || "submission");
   res.send(buffer);
 });
 
@@ -463,11 +515,11 @@ sharedRouter.delete("/student/assignments/:id/complete", requireAuth, completeRa
   }
 
   const existing = db.assignmentCompletions.find((c) => c.assignmentId === assignment.id && c.studentId === student.id);
-  if (existing?.submissionFile) {
-    return res.status(409).json({ message: "A file has already been submitted for this assignment and cannot be withdrawn. Contact your teacher if you need to resubmit." });
+  if (existing?.submissionFiles?.length) {
+    return res.status(409).json({ message: "File(s) have already been submitted for this assignment and cannot be withdrawn. Contact your teacher if you need to resubmit." });
   }
-  if (isPastDeadline(assignment.dueDate)) {
-    return res.status(403).json({ message: "The deadline for this assignment has passed. You can no longer make changes." });
+  if (existing?.evaluatedAt) {
+    return res.status(409).json({ message: "This assignment has already been graded and cannot be withdrawn. Contact your teacher if you need to resubmit." });
   }
 
   db.assignmentCompletions = db.assignmentCompletions.filter(
