@@ -1,7 +1,16 @@
-const TEACHER_CODE_DELIMITERS = /,|\/|&|\s+and\s+/i;
+const TEACHER_CODE_DELIMITERS = /,|\/|&|::|\s+and\s+/i;
 
+// Schedule "teacher" fields carry the same free-text conventions as subject
+// "teacher" fields (see subjectTeacherCodes below): combined codes like
+// "AYV, LRG" or "DCE/SSR/SYN", the "::" co-teaching separator, and
+// parenthetical lab/zone annotations such as "AGA(LAB-2)" or "SBK(ZONE-2)".
+// Previously this didn't strip the "(...)" annotations or split on "::",
+// so e.g. "AGA(LAB-2)" and "DCE :: AGA(LAB-2)" never matched teacher "AGA"
+// or "DCE" at all, silently dropping those classes from that teacher's
+// "classes taught" list (they couldn't select the class in the dropdown).
 export function teacherCodes(value) {
   return String(value || "")
+    .replace(/\([^)]*\)/g, " ")
     .split(TEACHER_CODE_DELIMITERS)
     .map((code) => code.trim().toLowerCase())
     .filter(Boolean);
@@ -49,4 +58,15 @@ export function subjectTeacherCodes(value) {
 export function subjectBelongsToTeacher(subject, teacherCode) {
   const code = String(teacherCode || "").trim().toLowerCase();
   return Boolean(code) && subjectTeacherCodes(subject?.teacher).includes(code);
+}
+
+// Legacy subject rows may carry a professor's display name while the
+// authoritative timetable carries the faculty code. Treat an exact
+// timetable assignment for the same subject and class as ownership too;
+// otherwise the teacher can see a class on the schedule but cannot mark its
+// attendance or results.
+export function subjectAssignedToTeacher(db, subject, teacherCode) {
+  if (subjectBelongsToTeacher(subject, teacherCode)) return true;
+  const subjectKeys = new Set([String(subject?.id || ""), String(subject?.code || ""), String(subject?.subjectName || "")].map((value) => value.trim().toLowerCase()).filter(Boolean));
+  return (db.schedules || []).some((schedule) => scheduleBelongsToTeacher(schedule, teacherCode) && schedule.section === subject?.className && subjectKeys.has(String(schedule.subject || "").trim().toLowerCase()));
 }

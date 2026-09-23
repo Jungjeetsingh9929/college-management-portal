@@ -2,10 +2,7 @@ import React, { useEffect, useState } from "react";
 import { AlertTriangle, Paperclip, X } from "lucide-react";
 import { Badge } from "../components/UI.jsx";
 import { apiFetch, downloadToFile } from "../context/api.js";
-
-function isOverdue(dueDate) {
-  return new Date(dueDate).getTime() < Date.now();
-}
+import { formatAssignmentDueDate, isAssignmentOverdue, isSubmissionLate } from "../utils/assignments.js";
 
 const MAX_ATTACHMENTS = 5;
 
@@ -202,8 +199,8 @@ export function FacultyAssignments() {
               <li key={a.id} style={{ marginBottom: '1rem', borderBottom: '1px solid #eee', paddingBottom: '1rem' }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
-                    <strong>{a.title}</strong> (Due: {new Date(a.dueDate).toLocaleString()}) - Class: {a.className}
-                    {isOverdue(a.dueDate) && <span style={{ marginLeft: "8px" }}><Badge value="overdue" /></span>}
+                    <strong>{a.title}</strong> (Due: {formatAssignmentDueDate(a.dueDate)}) - Class: {a.className}
+                    {isAssignmentOverdue(a) && <span style={{ marginLeft: "8px" }}><Badge value="overdue" /></span>}
                     <p>{a.description}</p>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "center" }}>
                       {(a.attachments || []).map(att => (
@@ -248,7 +245,7 @@ export function FacultyAssignments() {
                     ) : (
                       <div className="list-stack">
                         {submissions.map(sub => {
-                          const isLate = sub.completed && new Date(sub.completedAt).getTime() > new Date(a.dueDate).getTime();
+                          const isLate = sub.completed && isSubmissionLate(sub.completedAt, a.dueDate);
                           return (
                             <div key={sub.id} className="list-row" style={{ alignItems: "flex-start" }}>
                               <div style={{ flex: 1 }}>

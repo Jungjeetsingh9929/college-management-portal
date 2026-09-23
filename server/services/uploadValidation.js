@@ -67,3 +67,20 @@ export function hasValidFileSignature(file, types = DEFAULT_UPLOAD_TYPES) {
 export function extensionForMimetype(mimetype) {
   return ALLOWED_TYPES[mimetype]?.extension || null;
 }
+
+/**
+ * Sanitizes an uploaded file's original name before it's stored as display
+ * text. multer decodes multipart filenames as latin1, which garbles any
+ * non-ASCII name (e.g. Hindi/Bengali characters) unless it's re-decoded as
+ * utf8 here. Also strips control characters, quotes, backslashes and path
+ * separators so the name is safe to show back and to use in
+ * `res.attachment()`/Content-Disposition. The actual blob on disk is always
+ * a random `storedName`, so this is about display/output hygiene, not
+ * path-traversal (that's handled separately at the storage layer).
+ */
+export function cleanFileName(originalName, fallback = "file") {
+  const decoded = Buffer.from(String(originalName || ""), "latin1").toString("utf8");
+  // eslint-disable-next-line no-control-regex
+  const base = path.basename(decoded).replace(/[\u0000-\u001f\u007f"\\/]/g, "").trim();
+  return (base || fallback).slice(0, 120);
+}

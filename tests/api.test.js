@@ -73,12 +73,24 @@ try {
   assert.ok(adminFees.structures.length > 0);
   assert.ok(adminFees.studentFees.length > 0);
   assert.ok(adminFees.studentFees.every((item) => !("password" in item)));
-  const firstDepartment = adminFees.structures[0].departmentId;
-  const feeDepartmentStudents = await json(`/students?department=${encodeURIComponent(adminFees.structures[0].departmentName)}`, {
-    headers: { Authorization: `Bearer ${admin.token}` }
-  });
-  const feeTestStudentRecord = feeDepartmentStudents.students.find((item) => /^student\d+@example\.edu$/.test(item.email));
-  assert.ok(feeTestStudentRecord, "seed data should contain a roster student in the first fee department");
+  // Walk the fee structures to find one that actually has a roster student, rather than
+  // assuming structures[0] does: seeded departments are alphabetical starting with
+  // "Administration", which has no seeded student, so assuming index 0 made this
+  // assertion fail on every run and silently skipped every test file chained after this one.
+  let firstDepartment;
+  let feeTestStudentRecord;
+  for (const structure of adminFees.structures) {
+    const candidateStudents = await json(`/students?department=${encodeURIComponent(structure.departmentName)}`, {
+      headers: { Authorization: `Bearer ${admin.token}` }
+    });
+    const candidate = candidateStudents.students.find((item) => /^student\d+@example\.edu$/.test(item.email));
+    if (candidate) {
+      firstDepartment = structure.departmentId;
+      feeTestStudentRecord = candidate;
+      break;
+    }
+  }
+  assert.ok(feeTestStudentRecord, "seed data should contain a roster student in at least one fee department");
   const updatedStructure = await json(`/admin/fees/structures/${firstDepartment}`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${admin.token}` },
@@ -183,7 +195,7 @@ try {
   const subjects = await json("/subjects", {
     headers: { Authorization: `Bearer ${admin.token}` }
   });
-  const quizSubject = subjects.subjects.find((item) => item.className === quizClass);
+  const quizSubject = subjects.subjects.find((item) => item.className === quizClass && String(item.teacher || "").toLowerCase().split(/,|\/|&|::|\s+and\s+/i).map((code) => code.replace(/\([^)]*\)/g, "").trim()).includes("lrg"));
   assert.ok(quizSubject);
 
   // Fix 3 regression test: fire two concurrent mutating requests (different
@@ -567,11 +579,14 @@ try {
   });
   assert.equal(overflowRes.response.status, 409);
 
-  // Teacher list must never leak password hashes, and must be staff-only.
+  // The student navigation advertises the teacher directory; it must be
+  // available to authenticated students without leaking password hashes.
   const studentTeachersRes = await request("/teachers", {
     headers: { Authorization: `Bearer ${student.token}` }
   });
-  assert.equal(studentTeachersRes.response.status, 403);
+  assert.equal(studentTeachersRes.response.status, 200);
+  assert.ok(studentTeachersRes.data.teachers.length > 0);
+  assert.ok(studentTeachersRes.data.teachers.every((item) => !("password" in item)));
 
   const staffTeachers = await json("/teachers", {
     headers: { Authorization: `Bearer ${teacher.token}` }

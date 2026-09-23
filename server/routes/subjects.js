@@ -2,16 +2,22 @@ import { Router } from "express";
 import { makeId, readDb, writeDb } from "../db/fileStore.js";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
 import { findSheet, parseCredits, parseSemester } from "../services/marksService.js";
-import { requiredText, validateKeys, validId } from "../services/validation.js";
+import { enumValue, requiredText, validateKeys, validId, validTime } from "../services/validation.js";
+import { classesTaughtByTeacher, subjectAssignedToTeacher } from "../services/accessService.js";
 
 export const subjectsRouter = Router();
 
 const SUBJECT_FIELDS = ["subjectName", "code", "teacher", "className", "schedule", "room", "department", "semester", "credits"];
 const SUBJECT_TEXT_FIELDS = [["subjectName", 120], ["code", 30], ["teacher", 120], ["className", 80], ["schedule", 120], ["room", 40], ["department", 120]];
 
-subjectsRouter.get("/", requireAuth, async (_req, res) => {
+subjectsRouter.get("/", requireAuth, async (req, res) => {
   const db = await readDb();
-  res.json({ subjects: db.subjects, classes: db.classes });
+  if (req.user.role === "admin") return res.json({ subjects: db.subjects, classes: db.classes });
+  const student = req.user.role === "student" ? (db.students || []).find((item) => item.id === req.user.id) : null;
+  const allowedClasses = req.user.role === "teacher" ? new Set(classesTaughtByTeacher(db, req.user.code)) : new Set(student?.className ? [student.className] : []);
+  const subjects = (db.subjects || []).filter((item) => allowedClasses.has(item.className) && (req.user.role !== "teacher" || subjectAssignedToTeacher(db, item, req.user.code)));
+  const subjectIds = new Set(subjects.map((item) => item.id));
+  res.json({ subjects, classes: (db.classes || []).filter((item) => subjectIds.has(item.subjectId)) });
 });
 
 subjectsRouter.post("/", requireAuth, requireAdmin, async (req, res) => {
@@ -110,9 +116,12 @@ subjectsRouter.post("/classes", requireAuth, requireAdmin, async (req, res) => {
   const db = await readDb();
   try { validateKeys(req.body || {}, ["subjectId", "className", "day", "startTime", "endTime", "room"]); } catch { return res.status(400).json({ message: "Invalid timetable data." }); }
   if (!validId(req.body.subjectId)) return res.status(400).json({ message: "Subject ID is invalid." });
+  if (!(db.subjects || []).some((item) => item.id === req.body.subjectId)) return res.status(404).json({ message: "Subject not found." });
   for (const [field, max] of [["className", 80], ["day", 20], ["startTime", 5], ["endTime", 5]]) {
     try { requiredText(req.body[field], field, { max }); } catch { return res.status(400).json({ message: "Invalid timetable data." }); }
   }
+  try { enumValue(req.body.day, "Day", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]); } catch { return res.status(400).json({ message: "Invalid timetable data." }); }
+  if (!validTime(req.body.startTime) || !validTime(req.body.endTime) || req.body.startTime >= req.body.endTime) return res.status(400).json({ message: "Invalid timetable times." });
   const classItem = {
     id: makeId("cls"),
     subjectId: req.body.subjectId,
@@ -133,9 +142,13 @@ subjectsRouter.put("/classes/:id", requireAuth, requireAdmin, async (req, res) =
   const classItem = db.classes.find((item) => item.id === req.params.id);
   if (!classItem) return res.status(404).json({ message: "Class timing not found." });
   if (req.body.subjectId !== undefined && !validId(req.body.subjectId)) return res.status(400).json({ message: "Subject ID is invalid." });
+  if (req.body.subjectId !== undefined && !(db.subjects || []).some((item) => item.id === req.body.subjectId)) return res.status(404).json({ message: "Subject not found." });
   for (const [field, max] of [["className", 80], ["day", 20], ["startTime", 5], ["endTime", 5], ["room", 40]]) {
     if (req.body[field] !== undefined) { try { requiredText(req.body[field], field, { min: 0, max }); } catch { return res.status(400).json({ message: "Invalid timetable data." }); } }
   }
+  if (req.body.day !== undefined) { try { enumValue(req.body.day, "Day", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]); } catch { return res.status(400).json({ message: "Invalid timetable data." }); } }
+  const nextStart = req.body.startTime ?? classItem.startTime; const nextEnd = req.body.endTime ?? classItem.endTime;
+  if (!validTime(nextStart) || !validTime(nextEnd) || nextStart >= nextEnd) return res.status(400).json({ message: "Invalid timetable times." });
   ["subjectId", "className", "day", "startTime", "endTime", "room"].forEach((field) => {
     if (req.body[field] !== undefined) classItem[field] = req.body[field];
   });

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Download, FileText, Search } from "lucide-react";
 import { Badge, EmptyState } from "../components/UI.jsx";
-import { apiDownload, apiFetch, reportUrl } from "../context/api.js";
+import { apiFetch, downloadToFile, reportPath } from "../context/api.js";
 
 export function Reports() {
   const [records, setRecords] = useState([]);
@@ -31,16 +31,14 @@ export function Reports() {
   }, [records, query, subjectId]);
 
   async function download(type) {
-    const url = subjectId ? `${reportUrl(type)}?subjectId=${subjectId}` : reportUrl(type);
+    const path = subjectId ? `${reportPath(type)}?subjectId=${subjectId}` : reportPath(type);
     setError("");
     try {
-      const blob = await apiDownload(url);
-      const urlObj = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = urlObj;
-      anchor.download = `attendance-report.${type}`;
-      anchor.click();
-      URL.revokeObjectURL(urlObj);
+      // Use the shared downloadToFile helper (context/api.js) instead of a hand-rolled
+      // anchor: it appends the temporary <a> to the DOM before .click() (required for
+      // Firefox to fire the synthetic click) and defers revokeObjectURL out of the same
+      // tick (so the download can't be cancelled before the browser reads the blob).
+      await downloadToFile(path, `attendance-report.${type}`);
     } catch (err) {
       setError(err.message);
     }

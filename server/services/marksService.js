@@ -1,4 +1,4 @@
-import { subjectBelongsToTeacher } from "./accessService.js";
+import { subjectAssignedToTeacher } from "./accessService.js";
 
 // ---- Grade scale (10-point) ---------------------------------------------
 // Thresholds are percentages of (internal + end-semester) marks. This is the
@@ -134,7 +134,7 @@ export function hodOverseesSubject(db, user, subject) {
 export function accessFor(db, user, subject) {
   const status = sheetStatus(db, subject.id);
   const isAdmin = user.role === "admin";
-  const isSubjectTeacher = user.role === "teacher" && subjectBelongsToTeacher(subject, user.code);
+  const isSubjectTeacher = user.role === "teacher" && subjectAssignedToTeacher(db, subject, user.code);
   const isOverseer = !isAdmin && hodOverseesSubject(db, user, subject);
   const mayEdit = isAdmin || isSubjectTeacher;
   const mayLock = isAdmin || isOverseer;

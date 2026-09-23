@@ -16,7 +16,9 @@ function ensureCollections(db) {
 }
 
 function isValidDate(value) {
-  return typeof value === "string" && DATE_RE.test(value) && !Number.isNaN(new Date(value).getTime());
+  if (typeof value !== "string" || !DATE_RE.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 // Everyone sees "all"-audience events. A specific audience is a className:

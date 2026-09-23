@@ -1,4 +1,5 @@
 import { promises as fs } from "fs";
+import os from "node:os";
 import path from "path";
 import { fileURLToPath } from "url";
 import pg from "pg";
@@ -6,9 +7,15 @@ import { seedData } from "./seedData.js";
 
 const { Pool, Client } = pg;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.join(__dirname, "database.json");
+const dbPath = process.env.DB_FILE_PATH
+  ? path.resolve(process.env.DB_FILE_PATH)
+  : process.env.NODE_ENV === "test"
+    ? path.join(os.tmpdir(), `college-portal-test-${process.pid}.json`)
+    : path.join(__dirname, "database.json");
 export const usePostgres = Boolean(process.env.DATABASE_URL);
-if (process.env.NODE_ENV === "production" && !usePostgres) throw new Error("DATABASE_URL must be configured in production.");
+if (!usePostgres && !["development", "test"].includes(process.env.NODE_ENV)) {
+  console.warn("[startup] DATABASE_URL is not configured; using the local JSON fallback. Use PostgreSQL for staging/production and never distribute server/db/database.json.");
+}
 // connectionTimeoutMillis bounds how long a checkout can hang waiting on a
 // TCP handshake that will never complete (network black hole, wrong
 // security group). Without it, a fully-unreachable Postgres doesn't fail

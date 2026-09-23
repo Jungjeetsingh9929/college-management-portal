@@ -125,3 +125,9 @@ history separately; deleting the files in a new commit is not enough.
 When `DATABASE_URL` is set, the server stores its application state in a PostgreSQL table and automatically initializes the table on first start. Local JSON storage remains available only for development and tests; production startup fails if `DATABASE_URL` is missing. Render should provide `DATABASE_URL`, `JWT_SECRET`, `FRONTEND_URL`/`CLIENT_ORIGIN`, token settings, and upload-storage settings through its environment configuration. Uploaded files use isolated runtime storage; durable production retention requires object storage or a persistent disk.
 
 This project is best viewed as a full-stack learning and portfolio project, not a production-ready college system.
+
+### Clean release requirements
+
+The release must not contain `server/db/database.json`, `storage/`, `dist/`, or any generated student, attendance, complaint, payment, or upload records. These paths are ignored by Git and must be created or provisioned at runtime. Use the included `.env.example` as the configuration template, replace every placeholder with operator-managed values, and set `CLIENT_ORIGIN` or `FRONTEND_URL` to the exact browser-facing origin used by students and staff. A missing or incorrect production origin prevents browser API requests and makes login fail with a CORS error.
+
+The client now signs the user out and redirects to login when both access and refresh tokens are invalid. Administrative deletion and activation-state controls require confirmation, and subject/timetable deletion explains the records affected before the request is sent.

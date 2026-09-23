@@ -871,6 +871,21 @@ if (!seedData.schedules.some((schedule) => schedule.id === "sch-e2e-demo-monday-
   );
 }
 
+// Every scheduled teaching assignment must have a corresponding subject row;
+// otherwise the faculty timetable renders correctly but attendance and marks
+// selectors have no subjectId to operate on.
+if (!seedData.subjects.some((subject) => subject.id === "sub-e2e-operating-systems")) {
+  seedData.subjects.push({
+    id: "sub-e2e-operating-systems",
+    subjectName: "Operating Systems",
+    code: "OS-E2E",
+    teacher: "DEMO",
+    className: "CSE 3A",
+    schedule: "Wednesday 10:20-11:10",
+    room: "S302"
+  });
+}
+
 // Give one student per showcased section a fuller attendance history so
 // the attendance/reports views have something realistic to display.
 const highAttendanceStudent = seedData.students.find((student) => student.id === "stu-006");

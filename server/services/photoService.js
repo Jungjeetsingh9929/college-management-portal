@@ -1,9 +1,9 @@
-import path from "node:path";
 import { deleteFile } from "../db/blobStore.js";
+import { resolveUploadRoot } from "../utils/uploadRoot.js";
 
 // Shared by routes/photos.js and the student-delete handler in
 // routes/students.js so both agree on where photo blobs live.
-export const photoUploadRoot = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), "storage", "student-photos"));
+export const photoUploadRoot = resolveUploadRoot("student-photos");
 export const PHOTO_MAX_BYTES = Number(process.env.PHOTO_MAX_BYTES) || 2 * 1024 * 1024;
 
 export function ensurePhotoCollections(db) {

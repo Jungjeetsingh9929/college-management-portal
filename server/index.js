@@ -1,4 +1,5 @@
 import "./config/loadEnv.js";
+import "./config/productionPreflight.js";
 import { configuredClientOrigins, validateClientOrigins } from "./config/clientOrigin.js";
 import cors from "cors";
 import express from "express";

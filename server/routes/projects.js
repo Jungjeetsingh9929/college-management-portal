@@ -25,7 +25,7 @@ import {
   validateGuide,
   validateTeamMembers
 } from "../services/projectService.js";
-import { PROJECT_UPLOAD_TYPES, createUploadFileFilter, extensionForMimetype, hasValidFileSignature } from "../services/uploadValidation.js";
+import { PROJECT_UPLOAD_TYPES, cleanFileName, createUploadFileFilter, extensionForMimetype, hasValidFileSignature } from "../services/uploadValidation.js";
 import { enumValue, requiredText, validateKeys } from "../services/validation.js";
 
 export const projectsRouter = Router();
@@ -52,14 +52,6 @@ function parseUpload(req, res, next) {
   });
 }
 
-// multer decodes multipart filenames as latin1, which garbles non-ASCII names.
-function cleanFileName(originalName) {
-  const decoded = Buffer.from(String(originalName || ""), "latin1").toString("utf8");
-  // eslint-disable-next-line no-control-regex
-  const base = decoded.replace(/[\u0000-\u001f\u007f"\\/]/g, "").trim();
-  return (base || "project-document").slice(0, 120);
-}
-
 function requireStudentRole(req, res, next) {
   if (req.user?.role !== "student") return res.status(403).json({ message: "Only students can perform this action." });
   next();
@@ -71,7 +63,7 @@ function buildFile(req, uploaderName) {
   return {
     storedName,
     file: {
-      name: cleanFileName(req.file.originalname),
+      name: cleanFileName(req.file.originalname, "project-document"),
       type: req.file.mimetype,
       size: req.file.size,
       uploadedBy: { id: req.user.id, name: uploaderName },

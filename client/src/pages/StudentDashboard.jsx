@@ -30,7 +30,7 @@ export function StudentDashboard() {
   }, [portal]);
   const activeClassIndex = scheduleToday.findIndex((item) => {
     const now = new Date().getHours() * 60 + new Date().getMinutes();
-    return now >= timeToMinutes(item.startTime) && now <= timeToMinutes(item.endTime);
+    return now >= timeToMinutes(item.startTime) && now < timeToMinutes(item.endTime);
   });
   const nextClass = scheduleToday.find((item) => timeToMinutes(item.startTime) > new Date().getHours() * 60 + new Date().getMinutes());
   const pendingAssignments = portal?.assignments.filter((item) => !item.completed) || [];
@@ -57,7 +57,7 @@ export function StudentDashboard() {
         <StatCard label="Overall attendance" value={`${portal.attendance.stats.percentage}%`} hint="Across all subjects" tone="blue" icon={CalendarCheck} />
         <StatCard label="Classes present" value={portal.attendance.stats.present} hint={`${portal.attendance.stats.total} marked classes`} tone="green" icon={CheckCircle2} />
         <StatCard label="Pending assignments" value={pendingAssignments.length} hint="Keep your deadlines clear" tone="amber" icon={FileText} />
-        <StatCard label="Fee status" value={portal.fees.status === "not-published" ? "N/A" : portal.fees.status} hint={portal.fees.dueDate ? `Due ${portal.fees.dueDate}` : "No fee notice published"} tone="red" icon={IndianRupee} />
+        <StatCard label="Fee status" value={portal.fees.status === "not-published" ? "N/A" : portal.fees.status} hint={portal.fees.dueDate ? `Due ${portal.fees.dueDate}` : portal.fees.status === "paid" ? "No outstanding balance" : portal.fees.status === "not-published" ? "No fee notice published" : "No due date"} tone={portal.fees.status === "paid" ? "green" : "red"} icon={IndianRupee} />
       </section>
 
       <section className="quick-actions panel">

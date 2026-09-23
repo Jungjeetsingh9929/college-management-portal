@@ -1,26 +1,26 @@
 import { Router } from "express";
 import crypto from "node:crypto";
-import path from "node:path";
 import multer from "multer";
 import { makeId, readDb, writeDb } from "../db/fileStore.js";
-import { loadFile, saveFile } from "../db/blobStore.js";
+import { deleteFile, loadFile, saveFile } from "../db/blobStore.js";
 import { requireAuth } from "../middleware/auth.js";
 import { clientKey, rateConfig, rateLimit } from "../middleware/rateLimit.js";
 import { calculateStudentStats, enrichAttendance, publicStudent, subjectStats, today, upsertAttendance } from "../services/attendanceService.js";
 import { parseAnswerIndex, requiredText } from "../services/validation.js";
 import { getCollegeGeofence, isWithinCollege } from "../utils/geo.js";
-import { classesTaughtByTeacher, scheduleBelongsToTeacher } from "../services/accessService.js";
+import { classesTaughtByTeacher, scheduleBelongsToTeacher, subjectAssignedToTeacher } from "../services/accessService.js";
 import { academicsFor } from "../services/marksService.js";
 import { isProjectMember } from "../services/projectService.js";
 import { ensureCollections, publicStudentFee } from "./fees.js";
-import { extensionForMimetype, hasValidFileSignature, uploadFileFilter } from "../services/uploadValidation.js";
+import { cleanFileName, extensionForMimetype, hasValidFileSignature, uploadFileFilter } from "../services/uploadValidation.js";
+import { resolveUploadRoot } from "../utils/uploadRoot.js";
 
 export const sharedRouter = Router();
-const uploadRoot = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), "storage", "submissions"));
-const facultyUploadRoot = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), "storage", "faculty-notes"));
+const uploadRoot = resolveUploadRoot("submissions");
+const facultyUploadRoot = resolveUploadRoot("faculty-notes");
 // Reference material a teacher attaches to an assignment (not a submission).
 // Kept in its own folder so it's never confused with student submissions.
-const assignmentAttachmentRoot = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), "storage", "assignment-attachments"));
+const assignmentAttachmentRoot = resolveUploadRoot("assignment-attachments");
 const submissionUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: Number(process.env.SUBMISSION_MAX_BYTES) || 5 * 1024 * 1024 },
@@ -159,7 +159,7 @@ function buildSearchIndex(db, user) {
     (db.schedules || []).forEach((item) => add("timetable", item.id, item.subject, `${item.day} · ${item.startTime}-${item.endTime} · ${item.section}`, "/central-timetable", `${item.teacher} ${item.room}`));
   } else if (user.role === "teacher") {
     const classes = classesTaughtByTeacher(db, user.code); (db.students || []).filter((item) => classes.includes(item.className)).forEach((item) => add("student", item.id, item.name, `${item.rollNumber} · ${item.className}`, "/faculty", item.email));
-    (db.subjects || []).filter((item) => classes.includes(item.className)).forEach((item) => add("subject", item.id, item.subjectName, `${item.code} · ${item.className}`, "/schedule"));
+    (db.subjects || []).filter((item) => classes.includes(item.className) && subjectAssignedToTeacher(db, item, user.code)).forEach((item) => add("subject", item.id, item.subjectName, `${item.code} · ${item.className}`, "/schedule"));
     (db.schedules || []).filter((item) => scheduleBelongsToTeacher(item, user.code)).forEach((item) => add("class", item.id, item.subject, `${item.day} · ${item.startTime}-${item.endTime} · ${item.section}`, "/schedule", item.room));
     (db.assignments || []).filter((item) => item.teacherId === user.id).forEach((item) => add("assignment", item.id, item.title, `${item.className} · due ${item.dueDate}`, "/faculty/assignments", item.description));
   } else {
@@ -307,6 +307,18 @@ function computeAssignmentStatus(dueDate, completion) {
   }
 
   const msPerDay = 24 * 60 * 60 * 1000;
+  // A date-only deadline means the whole calendar day, not midnight at the
+  // start of that day. Comparing timestamps made a deadline exactly three
+  // calendar days away appear "upcoming" late in the current day.
+  if (!/T\d/.test(String(dueDate))) {
+    const current = new Date();
+    const todayUtc = Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), current.getUTCDate());
+    const dueUtc = Date.UTC(due.getFullYear(), due.getMonth(), due.getDate());
+    const calendarDays = Math.round((dueUtc - todayUtc) / msPerDay);
+    if (calendarDays < 0) return "overdue";
+    if (calendarDays <= 3) return "due-soon";
+    return "upcoming";
+  }
   const diffMs = due.getTime() - Date.now();
   if (diffMs < 0) return "overdue";
   if (diffMs <= 3 * msPerDay) return "due-soon";
@@ -460,14 +472,19 @@ sharedRouter.post("/student/assignments/:id/submission", requireAuth, completeRa
     const extension = extensionForMimetype(file.mimetype);
     const storedName = `${crypto.randomUUID()}.${extension}`;
     await saveFile({ storedName, buffer: file.buffer, localDir: uploadRoot });
-    savedFiles.push({ name: file.originalname.slice(0, 120), type: file.mimetype, size: file.size, storedName });
+    savedFiles.push({ name: cleanFileName(file.originalname, "submission"), type: file.mimetype, size: file.size, storedName });
   }
 
   const completion = existing || { id: makeId("cmp"), assignmentId: assignment.id, studentId: student.id, submissionText: "", submissionLink: "" };
   completion.completedAt = new Date().toISOString();
   completion.submissionFiles = [...existingFiles, ...savedFiles];
   if (!existing) db.assignmentCompletions.push(completion);
-  await writeDb(db);
+  try {
+    await writeDb(db);
+  } catch (error) {
+    await Promise.all(savedFiles.map((file) => deleteFile({ storedName: file.storedName, localDir: uploadRoot }).catch(() => {})));
+    throw error;
+  }
   res.json({ completed: true, submissionFiles: completion.submissionFiles });
 });
 
@@ -576,9 +593,10 @@ sharedRouter.get("/quiz/:id", requireAuth, async (req, res) => {
   if (req.user.role === "student" && (!student || student.className !== quiz.className)) {
     return res.status(403).json({ message: "You are not in the class for this quiz." });
   }
-  // Any teacher could pull any other teacher's quiz by id. Scope it the same
-  // way the rest of the faculty surface is scoped.
-  if (req.user.role === "teacher" && quiz.teacherId !== req.user.id && !classesTaughtByTeacher(db, req.user.code).includes(quiz.className)) {
+  // Quiz questions are authoring material, not class-wide directory data.
+  // A teacher may retrieve only quizzes they authored; students reach this
+  // route through the class check above, and admins retain support access.
+  if (req.user.role === "teacher" && quiz.teacherId !== req.user.id) {
     return res.status(404).json({ message: "Quiz not found." });
   }
   const attempted = req.user.role === "student" &&

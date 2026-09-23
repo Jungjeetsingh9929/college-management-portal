@@ -19,7 +19,7 @@ async function login(email, password, role) { const result = await request("/aut
 try {
   const teacher = await login("lrg@example.edu", process.env.FACULTY_LRG_PASSWORD, "teacher");
   const student = await login("student001@example.edu", process.env.SEED_STUDENT_PASSWORD, "student");
-  const subjects = await request("/subjects", teacher.token); const classes = await request("/faculty/students", teacher.token); const subject = subjects.data.subjects.find((item) => classes.data.classes.includes(item.className)); assert.ok(subject);
+  const subjects = await request("/subjects", teacher.token); const classes = await request("/faculty/students", teacher.token); const subject = subjects.data.subjects.find((item) => classes.data.classes.includes(item.className) && String(item.teacher || "").toLowerCase().split(/,|\/|&|::|\s+and\s+/i).map((code) => code.replace(/\([^)]*\)/g, "").trim()).includes("lrg")); assert.ok(subject);
   const created = await request("/faculty/quiz-sessions", teacher.token, { method: "POST", body: JSON.stringify({ className: subject.className, subjectId: subject.id, title: "Regression session", durationMinutes: 20 }) }); assert.equal(created.response.status, 201);
   const session = created.data.session;
   const question = await request(`/faculty/quiz-sessions/${session.id}/questions`, teacher.token, { method: "POST", body: JSON.stringify({ question: "Which answer is correct?", options: ["Correct", "Wrong"], correctAnswerIndex: 0 }) }); assert.equal(question.response.status, 201); assert.equal(question.data.quiz.correctAnswerIndex, undefined);

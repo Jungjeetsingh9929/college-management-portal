@@ -2,7 +2,8 @@ import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
 import { readDb, writeDb } from "../db/fileStore.js";
 
-const secret = process.env.JWT_SECRET; const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || "15m"; const REFRESH_TOKEN_DAYS = Math.max(1, Number(process.env.REFRESH_TOKEN_DAYS) || 30);
+const secret = process.env.JWT_SECRET || (process.env.NODE_ENV === "development" ? crypto.createHash("sha256").update(`college-portal-dev:${process.cwd()}`).digest("hex") : ""); const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || "15m"; const REFRESH_TOKEN_DAYS = Math.max(1, Number(process.env.REFRESH_TOKEN_DAYS) || 30);
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === "development") console.warn("[startup] JWT_SECRET is not set; using a workspace-local development secret. Set JWT_SECRET for shared or deployed environments.");
 if (!secret || secret === "replace-with-a-long-random-secret" || secret.length < 32) throw new Error("JWT_SECRET must be set to a random value of at least 32 characters.");
 export function signToken(user) { return jwt.sign({ id: user.id, role: user.role || "student", name: user.name, email: user.email, code: user.code, className: user.className, passwordVersion: user.passwordVersion || 0, sessionId: user.sessionId || null, tokenType: "access" }, secret, { expiresIn: ACCESS_TOKEN_TTL, issuer: "college-portal", audience: "college-portal-client", algorithm: "HS256" }); }
 function digest(value) { return crypto.createHash("sha256").update(String(value)).digest("hex"); }

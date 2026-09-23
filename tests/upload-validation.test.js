@@ -6,6 +6,7 @@ import {
   DEFAULT_UPLOAD_TYPES,
   LIBRARY_UPLOAD_TYPES,
   PHOTO_UPLOAD_TYPES,
+  cleanFileName,
   createUploadFileFilter,
   extensionForMimetype,
   hasValidFileSignature,
@@ -54,5 +55,26 @@ assert.equal(filterResult(photoFilter, { mimetype: "image/jpeg", originalname: "
 assert.equal(extensionForMimetype(DOCX), "docx");
 assert.equal(extensionForMimetype("image/jpeg"), "jpg");
 assert.equal(extensionForMimetype("text/html"), null);
+
+// cleanFileName: shared by library.js, projects.js, faculty.js (notes +
+// assignment attachments) and shared.js (submissions) — round 6 #5.
+// Plain ASCII name passes through untouched (aside from the length cap).
+assert.equal(cleanFileName("report.pdf"), "report.pdf");
+// multer decodes multipart filenames as latin1; a UTF-8 name must be
+// recovered rather than shown garbled.
+const utf8Name = Buffer.from("असाइनमेंट.pdf", "utf8").toString("latin1");
+assert.equal(cleanFileName(utf8Name), "असाइनमेंट.pdf");
+// Control characters, quotes, backslashes and path separators are stripped -
+// important for values later used in a Content-Disposition header.
+assert.equal(cleanFileName('evil"name\\..\u0007.pdf'), "evilname...pdf");
+// A path-like name is reduced to its basename, same as library.js before.
+assert.equal(cleanFileName("../../etc/passwd"), "passwd");
+// Empty/whitespace-only/undefined names fall back to the caller-supplied
+// default rather than producing an empty display name.
+assert.equal(cleanFileName("", "assignment-attachment"), "assignment-attachment");
+assert.equal(cleanFileName("   ", "submission"), "submission");
+assert.equal(cleanFileName(undefined), "file");
+// Long names are still capped at 120 chars.
+assert.equal(cleanFileName(`${"a".repeat(200)}.pdf`).length, 120);
 
 console.log("upload-validation tests passed");

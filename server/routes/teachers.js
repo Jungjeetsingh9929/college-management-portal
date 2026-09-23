@@ -1,14 +1,14 @@
 import bcrypt from "bcryptjs";
 import { Router } from "express";
 import { makeId, readDb, writeDb } from "../db/fileStore.js";
-import { requireAdmin, requireAuth, requireStaff } from "../middleware/auth.js";
+import { requireAdmin, requireAuth } from "../middleware/auth.js";
 import { PASSWORD_REQUIREMENTS, requiredText, validEmail, validPassword, validateKeys } from "../services/validation.js";
 import { emailInUse, normalizeEmail } from "../services/accountService.js";
 import { revokeSessionsForUser } from "../middleware/auth.js";
 
 export const teachersRouter = Router();
 
-teachersRouter.get("/", requireAuth, requireStaff, async (_req, res) => {
+teachersRouter.get("/", requireAuth, async (_req, res) => {
   const db = await readDb();
   db.teachers ||= [];
   res.json({ teachers: db.teachers.map(({ password, ...teacher }) => ({ ...teacher, workload: (db.schedules || []).filter((item) => String(item.teacher || "").toLowerCase().includes(String(teacher.code || "").toLowerCase())).length })) });

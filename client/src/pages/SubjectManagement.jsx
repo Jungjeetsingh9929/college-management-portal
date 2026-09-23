@@ -97,6 +97,8 @@ export function SubjectManagement() {
   }
 
   async function deleteSubject(id) {
+    const subject = subjects.find((item) => item.id === id);
+    if (!window.confirm(`Delete subject “${subject?.subjectName || id}”? This also removes its timetable, attendance, quiz, and marks records where allowed.`)) return;
     setMessage("");
     setError("");
     try {
@@ -143,6 +145,8 @@ export function SubjectManagement() {
   }
 
   async function deleteClass(id) {
+    const classItem = classes.find((item) => item.id === id);
+    if (!window.confirm(`Delete the ${classItem?.day || "selected"} class timing${classItem?.room ? ` in ${classItem.room}` : ""}?`)) return;
     setMessage("");
     setError("");
     try {
@@ -223,10 +227,10 @@ export function SubjectManagement() {
                     <td>{subject.teacher}</td>
                     <td>{subject.schedule || "-"}<span>{subject.room}</span></td>
                     <td>
-                      <button className="icon-button" onClick={() => editSubject(subject)} title="Edit subject">
+                      <button type="button" className="icon-button" onClick={() => editSubject(subject)} title="Edit subject">
                         <Edit3 size={16} />
                       </button>
-                      <button className="icon-button danger" onClick={() => deleteSubject(subject.id)} title="Delete subject">
+                      <button type="button" className="icon-button danger" onClick={() => deleteSubject(subject.id)} title="Delete subject">
                         <Trash2 size={16} />
                       </button>
                     </td>
@@ -282,10 +286,10 @@ export function SubjectManagement() {
                     <span>{classItem.day} · {classItem.startTime}-{classItem.endTime} · {classItem.room}</span>
                   </div>
                   <div className="action-row">
-                    <button className="icon-button" onClick={() => editClass(classItem)} title="Edit class timing">
+                    <button type="button" className="icon-button" onClick={() => editClass(classItem)} title="Edit class timing">
                       <Edit3 size={16} />
                     </button>
-                    <button className="icon-button danger" onClick={() => deleteClass(classItem.id)} title="Delete class">
+                    <button type="button" className="icon-button danger" onClick={() => deleteClass(classItem.id)} title="Delete class">
                       <Trash2 size={16} />
                     </button>
                   </div>

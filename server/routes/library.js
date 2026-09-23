@@ -1,14 +1,14 @@
-import path from "node:path";
 import crypto from "node:crypto";
 import multer from "multer";
 import { Router } from "express";
 import { deleteFile, loadFile, saveFile } from "../db/blobStore.js";
 import { makeId, readDb, writeDb } from "../db/fileStore.js";
 import { requireAuth, requireStaff } from "../middleware/auth.js";
-import { LIBRARY_UPLOAD_TYPES, createUploadFileFilter, extensionForMimetype, hasValidFileSignature } from "../services/uploadValidation.js";
+import { LIBRARY_UPLOAD_TYPES, cleanFileName, createUploadFileFilter, extensionForMimetype, hasValidFileSignature } from "../services/uploadValidation.js";
 import { classesTaughtByTeacher } from "../services/accessService.js";
 import { applyAudience, audienceVisibleTo } from "../services/audienceService.js";
 import { enumValue, requiredText, validateKeys } from "../services/validation.js";
+import { resolveUploadRoot } from "../utils/uploadRoot.js";
 
 export const libraryRouter = Router();
 
@@ -21,7 +21,7 @@ export const LIBRARY_ITEM_TYPES = ["file", "link"];
 const LIBRARY_FIELDS = ["title", "description", "category", "subject", "type", "url", "audience"];
 const MAX_URL_LENGTH = 2000;
 
-const libraryUploadRoot = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), "storage", "library"));
+const libraryUploadRoot = resolveUploadRoot("library");
 const libraryUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: Number(process.env.LIBRARY_MAX_BYTES) || 10 * 1024 * 1024, files: 1 },
@@ -59,14 +59,6 @@ function validLink(value) {
   if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Link URL must start with http:// or https://.");
   if (parsed.username || parsed.password) throw new Error("Link URL must not contain credentials.");
   return parsed.toString();
-}
-
-// multer decodes multipart filenames as latin1, which garbles non-ASCII names.
-function cleanFileName(originalName) {
-  const decoded = Buffer.from(String(originalName || ""), "latin1").toString("utf8");
-  // eslint-disable-next-line no-control-regex
-  const base = path.basename(decoded).replace(/[\u0000-\u001f\u007f"\\/]/g, "").trim();
-  return (base || "library-file").slice(0, 120);
 }
 
 function publicItem(item) {
@@ -168,7 +160,7 @@ libraryRouter.post("/", requireAuth, requireStaff, parseUpload, async (req, res)
       return res.status(400).json({ message: "The uploaded file content does not match its declared type." });
     }
     storedName = `${crypto.randomUUID()}.${extensionForMimetype(req.file.mimetype)}`;
-    item.file = { name: cleanFileName(req.file.originalname), type: req.file.mimetype, size: req.file.size, storedName };
+    item.file = { name: cleanFileName(req.file.originalname, "library-file"), type: req.file.mimetype, size: req.file.size, storedName };
     await saveFile({ storedName, buffer: req.file.buffer, localDir: libraryUploadRoot });
   }
 

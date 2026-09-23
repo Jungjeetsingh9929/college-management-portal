@@ -29,8 +29,11 @@ schedulesRouter.get("/", requireAuth, async (req, res) => {
   const db = await readDb();
   db.schedules ||= [];
   const allSchedules = visibleSchedules(db, req.user, req.query); const hasPagination = req.query.page !== undefined || req.query.perPage !== undefined; const page = Math.max(1, Math.min(10000, Number.parseInt(req.query.page || "1", 10) || 1)); const perPage = Math.max(1, Math.min(1000, Number.parseInt(req.query.perPage || "1000", 10) || 1000)); const schedules = hasPagination ? allSchedules.slice((page - 1) * perPage, page * perPage) : allSchedules;
-  const sections = [...new Set(db.schedules.map((item) => item.section))].sort();
-  res.json({ schedules, pagination: { page, perPage, total: allSchedules.length, pages: Math.ceil(allSchedules.length / perPage) }, sections, departments: [...new Set(db.schedules.map((item) => item.department).filter(Boolean))].sort(), semesters: [...new Set(db.schedules.map((item) => item.semester).filter(Boolean))].sort(), faculty: [...new Set(db.schedules.map((item) => item.teacher).filter(Boolean))].sort(), classrooms: [...new Set(db.schedules.map((item) => item.room).filter(Boolean))].sort() });
+  // Filter metadata is part of the response contract too. Returning the full
+  // college's section/faculty/room lists while the schedule rows are class-
+  // scoped still disclosed unrelated timetable structure to students.
+  const values = (field) => [...new Set(allSchedules.map((item) => item[field]).filter(Boolean))].sort();
+  res.json({ schedules, pagination: { page, perPage, total: allSchedules.length, pages: Math.ceil(allSchedules.length / perPage) }, sections: values("section"), departments: values("department"), semesters: values("semester"), faculty: values("teacher"), classrooms: values("room") });
 });
 
 schedulesRouter.post("/", requireAuth, requireAdmin, async (req, res) => {
@@ -48,7 +51,7 @@ schedulesRouter.post("/", requireAuth, requireAdmin, async (req, res) => {
     notes = req.body.notes === undefined ? "" : requiredText(req.body.notes, "Notes", { min: 0, max: 500 });
   } catch { return res.status(400).json({ message: "Invalid timetable data." }); }
   const period = Number(req.body.period);
-  if (!Number.isInteger(period) || period < 1 || period > 12 || !validTime(req.body.startTime) || !validTime(req.body.endTime)) return res.status(400).json({ message: "Period and times are invalid." });
+  if (!Number.isInteger(period) || period < 1 || period > 12 || !validTime(req.body.startTime) || !validTime(req.body.endTime) || minutes(req.body.startTime) >= minutes(req.body.endTime)) return res.status(400).json({ message: "Period and times are invalid." });
   const schedule = {
     id: makeId("sch"),
     day, section, room, period,
@@ -78,6 +81,7 @@ schedulesRouter.put("/:id", requireAuth, requireAdmin, async (req, res) => {
     if (req.body[field] !== undefined) schedule[field] = req.body[field];
   });
   if (req.body.period !== undefined) schedule.period = Number(req.body.period);
+  if (minutes(schedule.startTime) >= minutes(schedule.endTime)) return res.status(400).json({ message: "End time must be after start time." });
   const foundConflicts = conflicts(db.schedules, schedule, schedule.id);
   if (foundConflicts.length) return res.status(409).json({ message: "Timetable conflict detected. Saving was blocked.", conflicts: foundConflicts.map(({ type, record }) => ({ type, id: record.id, subject: record.subject, teacher: record.teacher, room: record.room, section: record.section, day: record.day, startTime: record.startTime, endTime: record.endTime })), suggestions: suggestions(db.schedules.filter((item) => item.id !== schedule.id), schedule) });
   await writeDb(db);

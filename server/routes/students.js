@@ -7,6 +7,7 @@ import { PASSWORD_REQUIREMENTS, requiredText, validEmail, validPassword, validat
 import { emailInUse, normalizeEmail, rollNumberInUse } from "../services/accountService.js";
 import { revokeSessionsForUser } from "../middleware/auth.js";
 import { deletePhotoBlobs, detachPhotosForStudent } from "../services/photoService.js";
+import { collectSubmissionBlobs, deleteAssignmentBlobs } from "../services/assignmentService.js";
 import { validateProfileUpdate } from "../services/profileValidation.js";
 
 // Optional free-text profile fields shared by the create and update routes.
@@ -116,6 +117,8 @@ studentsRouter.post("/pending/:id/approve", requireAuth, requireAdmin, async (re
   const request = db.pendingStudents.find((item) => item.id === req.params.id);
   if (!request) return res.status(404).json({ message: "Student request not found." });
   if (request.approvalStatus !== "pending") return res.status(409).json({ message: "Request is already processed." });
+  if (emailInUse(db, request.email)) return res.status(409).json({ message: "This email already has an account." });
+  if (rollNumberInUse(db, request.rollNumber)) return res.status(409).json({ message: "This roll number is already assigned to another student." });
 
   const student = {
     id: makeId("stu"),
@@ -147,7 +150,7 @@ studentsRouter.post("/pending/:id/reject", requireAuth, requireAdmin, async (req
   if (!request) return res.status(404).json({ message: "Student request not found." });
   request.approvalStatus = "rejected";
   request.rejectedAt = new Date().toISOString();
-  request.rejectReason = req.body.reason || "";
+  request.rejectReason = typeof req.body?.reason === "string" ? req.body.reason.trim().slice(0, 300) : "";
   await writeDb(db);
   res.json({ success: true, message: "Student request rejected." });
 });
@@ -251,6 +254,10 @@ studentsRouter.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
   // tokens live, so a deleted student kept a working session until the token
   // expired. Clean up every collection that keys off studentId.
   db.attendanceCorrections = (db.attendanceCorrections || []).filter((item) => item.requestedBy !== id);
+  // Collect this student's submitted assignment files before the completion
+  // records pointing at them are filtered out below, same pattern as the
+  // photo-blob cleanup just underneath.
+  const submissionBlobs = collectSubmissionBlobs((db.assignmentCompletions || []).filter((item) => item.studentId === id));
   db.assignmentCompletions = (db.assignmentCompletions || []).filter((item) => item.studentId !== id);
   db.quizAttempts = (db.quizAttempts || []).filter((item) => item.studentId !== id);
   db.internalMarks = (db.internalMarks || []).filter((item) => item.studentId !== id);
@@ -264,5 +271,6 @@ studentsRouter.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
   revokeSessionsForUser(db, id);
   await writeDb(db);
   await deletePhotoBlobs(photoBlobs);
+  await deleteAssignmentBlobs({ submissionStoredNames: submissionBlobs });
   res.json({ ok: true });
 });

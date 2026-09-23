@@ -1,26 +1,16 @@
-# Dependencies
-node_modules/
-
-# Build output
-dist/
-
-# Environment / secrets — never commit real values
+# Local environment and secrets
 .env
 .env.*
 !.env.example
 
-# Locally generated per-account demo credentials (see server/scripts/seed.js)
-credential-groups/
-
-# Runtime file storage (uploaded notes/submissions)
+# Runtime state and generated uploads
+server/db/database.json
 storage/
 
-# Logs
-*.log
-npm-debug.log*
+# Build and dependency output
+node_modules/
+dist/
 
-# OS / editor cruft
+# Local logs and temporary files
+*.log
 .DS_Store
-Thumbs.db
-.vscode/
-.idea/

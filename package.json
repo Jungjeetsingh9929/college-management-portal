@@ -9,7 +9,7 @@
     "client": "vite --host 0.0.0.0 --port 5175",
     "server": "NODE_ENV=development node server/index.js",
     "seed": "node server/scripts/seed.js",
-    "test": "node tests/client-origin.test.js && node tests/auth-hardening.test.js && node tests/csv.test.js && node tests/audience.test.js && node tests/upload-validation.test.js && node tests/profile-validation.test.js && node tests/marks-service.test.js && node tests/payments.test.js && node tests/marks-api.test.js && node tests/payments-api.test.js && node tests/project-workflow.test.js && node tests/api.test.js && node tests/quiz-session.test.js && node tests/regression-flow.test.js",
+    "test": "node tests/run-all.js",
     "build": "vite build"
   },
   "dependencies": {

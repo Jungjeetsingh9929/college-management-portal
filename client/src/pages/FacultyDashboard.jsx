@@ -5,6 +5,7 @@ import { Badge, DashboardSkeleton, EmptyState, ErrorState, StatCard } from "../c
 import { apiFetch } from "../context/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { getUpcomingHolidays } from "../utils/dates.js";
+import { isAssignmentOverdue } from "../utils/assignments.js";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 export function FacultyDashboard() {
@@ -14,7 +15,7 @@ export function FacultyDashboard() {
   async function loadPortal() { try { setError(""); setPortal(await apiFetch("/faculty/portal")); } catch (err) { setError(err.message || "Unable to load faculty dashboard."); } }
   useEffect(() => { loadPortal(); }, []);
   const todayClasses = useMemo(() => portal?.schedule.filter((item) => item.day === DAYS[new Date().getDay()]).sort((a, b) => a.period - b.period) || [], [portal]);
-  const overdue = portal?.assignments.filter((item) => new Date(item.dueDate) < new Date()).length || 0;
+  const overdue = portal?.assignments.filter((item) => isAssignmentOverdue(item)).length || 0;
   const upcomingHolidays = getUpcomingHolidays(portal?.holidays || [], 7);
   if (error && !portal) return <ErrorState text={error} onRetry={loadPortal} />;
   if (!portal) return <DashboardSkeleton />;

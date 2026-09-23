@@ -1,24 +1,25 @@
 import { Router } from "express";
 import crypto from "node:crypto";
-import path from "node:path";
 import multer from "multer";
 import { makeId, readDb, writeDb } from "../db/fileStore.js";
-import { saveFile } from "../db/blobStore.js";
+import { deleteFile, loadFile, saveFile } from "../db/blobStore.js";
 import { requireAuth, requireFaculty as requireTeacher } from "../middleware/auth.js";
-import { classesTaughtByTeacher, scheduleBelongsToTeacher, subjectBelongsToTeacher } from "../services/accessService.js";
+import { classesTaughtByTeacher, scheduleBelongsToTeacher, subjectAssignedToTeacher } from "../services/accessService.js";
 import { rateConfig, rateLimit } from "../middleware/rateLimit.js";
 import { calculateStudentStats, facultyStudent, publicStudent } from "../services/attendanceService.js";
 import { parseAnswerIndex, requiredText, validateKeys } from "../services/validation.js";
-import { extensionForMimetype, hasValidFileSignature, uploadFileFilter } from "../services/uploadValidation.js";
+import { cleanFileName, extensionForMimetype, hasValidFileSignature, uploadFileFilter } from "../services/uploadValidation.js";
+import { resolveUploadRoot } from "../utils/uploadRoot.js";
+import { collectAttachmentBlobs, collectSubmissionBlobs, deleteAssignmentBlobs } from "../services/assignmentService.js";
 
 export const facultyRouter = Router();
 const quizCreateConfig = rateConfig("FACULTY_QUIZ_CREATE", { windowMs: 5 * 60 * 1000, limit: 30 });
-const facultyUploadRoot = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), "storage", "faculty-notes"));
+const facultyUploadRoot = resolveUploadRoot("faculty-notes");
 // Same path shared.js resolves for its attachment-download route — keep
 // these two constants in sync since they must point at the same folder.
-const assignmentAttachmentRoot = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), "storage", "assignment-attachments"));
+const assignmentAttachmentRoot = resolveUploadRoot("assignment-attachments");
 const noteUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: Number(process.env.SUBMISSION_MAX_BYTES) || 5 * 1024 * 1024 }, fileFilter: uploadFileFilter });
-function teacherScope(db, user) { const classes = classesTaughtByTeacher(db, user.code); return { classes, subjects: (db.subjects || []).filter((subject) => classes.includes(subject.className) && subjectBelongsToTeacher(subject, user.code)), students: (db.students || []).filter((student) => classes.includes(student.className)) }; }
+function teacherScope(db, user) { const classes = classesTaughtByTeacher(db, user.code); return { classes, subjects: (db.subjects || []).filter((subject) => classes.includes(subject.className) && subjectAssignedToTeacher(db, subject, user.code)), students: (db.students || []).filter((student) => classes.includes(student.className)) }; }
 
 // 1. Get schedule for logged-in teacher
 facultyRouter.get("/schedule", requireAuth, requireTeacher, async (req, res) => {
@@ -82,7 +83,7 @@ facultyRouter.post("/notes", requireAuth, requireTeacher, (req, res, next) => no
   if (!hasValidFileSignature(req.file)) return res.status(400).json({ message: "The uploaded note content does not match its declared type." });
   const db = await readDb(); const scope = teacherScope(db, req.user); const className = String(req.body.className || ""); if (!className || !scope.classes.includes(className)) return res.status(403).json({ message: "You can only upload notes for your classes." });
   const extension = extensionForMimetype(req.file.mimetype); const storedName = `${crypto.randomUUID()}.${extension}`; await saveFile({ storedName, buffer: req.file.buffer, localDir: facultyUploadRoot });
-  db.notes ||= []; const note = { id: crypto.randomUUID(), title: String((typeof req.body.title === "string" && req.body.title.trim()) || req.file.originalname).slice(0, 160), className, teacherId: req.user.id, teacherName: req.user.name, file: { name: req.file.originalname.slice(0, 120), type: req.file.mimetype, size: req.file.size, storedName }, createdAt: new Date().toISOString() }; db.notes.unshift(note); await writeDb(db); res.status(201).json({ note });
+  db.notes ||= []; const note = { id: crypto.randomUUID(), title: String((typeof req.body.title === "string" && req.body.title.trim()) || req.file.originalname).slice(0, 160), className, teacherId: req.user.id, teacherName: req.user.name, file: { name: cleanFileName(req.file.originalname, "note"), type: req.file.mimetype, size: req.file.size, storedName }, createdAt: new Date().toISOString() }; db.notes.unshift(note); try { await writeDb(db); } catch (error) { await deleteFile({ storedName, localDir: facultyUploadRoot }).catch(() => {}); throw error; } res.status(201).json({ note });
 });
 
 // 3. Assignments
@@ -158,6 +159,16 @@ facultyRouter.put("/assignments/:id", requireAuth, requireTeacher, async (req, r
   if (!classesTaught.includes(className)) {
     return res.status(403).json({ message: "You can only assign this to classes you teach." });
   }
+  // Both the teacher's own submissions view and the student's assignment
+  // list filter strictly by the assignment's *current* className, so
+  // changing it after students have submitted makes their work (text,
+  // links, and uploaded files) silently unreachable through the UI/API —
+  // it isn't deleted, just orphaned. Block the change instead, the same way
+  // subjects.js blocks a className edit once marks exist for that subject.
+  db.assignmentCompletions ||= [];
+  if (className !== assignment.className && db.assignmentCompletions.some((item) => item.assignmentId === assignment.id)) {
+    return res.status(409).json({ message: "Students have already submitted work for this assignment. Delete or move their submissions before changing the class." });
+  }
 
   assignment.title = safeTitle;
   assignment.description = safeDescription;
@@ -172,11 +183,18 @@ facultyRouter.delete("/assignments/:id", requireAuth, requireTeacher, async (req
   const db = await readDb();
   const assignment = (db.assignments || []).find((item) => item.id === req.params.id && item.teacherId === req.user.id);
   if (!assignment) return res.status(404).json({ message: "Assignment not found." });
+  const completionsForAssignment = (db.assignmentCompletions || []).filter((item) => item.assignmentId === assignment.id);
+  // Collect every blob this assignment owns — its own reference attachments
+  // and every student's submitted files — before the records pointing at
+  // them are removed below, mirroring projects.js's deleteProjectBlobs.
+  const attachmentStoredNames = collectAttachmentBlobs(assignment);
+  const submissionStoredNames = collectSubmissionBlobs(completionsForAssignment);
   db.assignments = (db.assignments || []).filter((item) => item.id !== assignment.id);
   // Submissions were left behind, so re-using the id (or an admin report that
   // counts completions) still saw rows for an assignment that no longer exists.
   db.assignmentCompletions = (db.assignmentCompletions || []).filter((item) => item.assignmentId !== assignment.id);
   await writeDb(db);
+  await deleteAssignmentBlobs({ attachmentStoredNames, submissionStoredNames });
   res.json({ ok: true });
 });
 
@@ -205,7 +223,7 @@ facultyRouter.post("/assignments/:id/attachments", requireAuth, requireTeacher, 
     const extension = extensionForMimetype(file.mimetype);
     const storedName = `${crypto.randomUUID()}.${extension}`;
     await saveFile({ storedName, buffer: file.buffer, localDir: assignmentAttachmentRoot });
-    assignment.attachments.push({ id: makeId("att"), name: file.originalname.slice(0, 120), type: file.mimetype, size: file.size, storedName });
+    assignment.attachments.push({ id: makeId("att"), name: cleanFileName(file.originalname, "assignment-attachment"), type: file.mimetype, size: file.size, storedName });
   }
   await writeDb(db);
   res.status(201).json({ assignment });
@@ -216,8 +234,10 @@ facultyRouter.delete("/assignments/:id/attachments/:attachmentId", requireAuth, 
   db.assignments ||= [];
   const assignment = db.assignments.find((item) => item.id === req.params.id && item.teacherId === req.user.id);
   if (!assignment) return res.status(404).json({ message: "Assignment not found." });
+  const removedAttachment = (assignment.attachments || []).find((item) => item.id === req.params.attachmentId);
   assignment.attachments = (assignment.attachments || []).filter((item) => item.id !== req.params.attachmentId);
   await writeDb(db);
+  await deleteAssignmentBlobs({ attachmentStoredNames: collectAttachmentBlobs({ attachments: removedAttachment ? [removedAttachment] : [] }) });
   res.json({ assignment });
 });
 
@@ -296,7 +316,7 @@ facultyRouter.post("/quizzes", requireAuth, requireTeacher, rateLimit({
     return res.status(403).json({ message: "You can only create attendance questions for classes you teach." });
   }
   const subject = (db.subjects || []).find((item) => item.id === subjectId);
-  if (!subject || subject.className !== className) {
+  if (!subject || subject.className !== className || !subjectAssignedToTeacher(db, subject, req.user.code)) {
     return res.status(400).json({ message: "Subject not found for the selected class." });
   }
   
@@ -363,7 +383,7 @@ facultyRouter.post("/quiz-sessions", requireAuth, requireTeacher, rateLimit({ ..
   const db = await readDb();
   const classesTaught = classesTaughtByTeacher(db, req.user.code);
   const subject = (db.subjects || []).find((item) => item.id === subjectId);
-  if (!className || !subject || subject.className !== className || !classesTaught.includes(className)) return res.status(403).json({ message: "You can only start sessions for classes and subjects you teach." });
+  if (!className || !subject || subject.className !== className || !classesTaught.includes(className) || !subjectAssignedToTeacher(db, subject, req.user.code)) return res.status(403).json({ message: "You can only start sessions for classes and subjects you teach." });
   db.quizSessions ||= [];
   const now = new Date();
   const session = { id: makeId("qsession"), teacherId: req.user.id, teacherName: req.user.name, className, subjectId, title: String(title || `${subject.subjectName} attendance session`).slice(0, 160), active: true, startedAt: now.toISOString(), endsAt: new Date(now.getTime() + Math.min(Math.max(Number(durationMinutes) || 30, 5), 180) * 60000).toISOString(), createdAt: now.toISOString() };

@@ -4,14 +4,14 @@ import { readDb, writeDb, makeId } from "../db/fileStore.js";
 import { requireAuth, requireStaff } from "../middleware/auth.js";
 import { clientKey, rateConfig, rateLimit } from "../middleware/rateLimit.js";
 import { calculateStudentStats, enrichAttendance, subjectStats, today, upsertAttendance, ATTENDANCE_STATUSES, createQrToken, attendanceAnalytics, attendanceCsv } from "../services/attendanceService.js";
-import { classesTaughtByTeacher, studentIdsVisibleToTeacher } from "../services/accessService.js";
+import { classesTaughtByTeacher, studentIdsVisibleToTeacher, subjectAssignedToTeacher } from "../services/accessService.js";
 import { isWithinCollege } from "../utils/geo.js";
 import { resolveClientOrigin } from "../config/clientOrigin.js";
 import { sendAttendanceReminderEmail } from "../services/emailService.js";
 
 export const attendanceRouter = Router();
-function parseDateParam(value) { if (value === undefined || value === null || value === "") return { date: null, valid: true }; if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(new Date(value).getTime())) return { date: null, valid: false }; return { date: value, valid: true }; }
-function canAccessSubject(db, req, subject) { return req.user.role === "admin" || (req.user.role === "teacher" && classesTaughtByTeacher(db, req.user.code).includes(subject?.className)); }
+function parseDateParam(value) { if (value === undefined || value === null || value === "") return { date: null, valid: true }; if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return { date: null, valid: false }; const parsed = new Date(`${value}T00:00:00.000Z`); if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) return { date: null, valid: false }; return { date: value, valid: true }; }
+function canAccessSubject(db, req, subject) { return req.user.role === "admin" || (req.user.role === "teacher" && classesTaughtByTeacher(db, req.user.code).includes(subject?.className) && subjectAssignedToTeacher(db, subject, req.user.code)); }
 function timeInWindow(session) { const now = Date.now(); return now >= new Date(session.startsAt).getTime() && now <= new Date(session.endsAt).getTime(); }
 // Client-supplied strings are used directly as object keys on db.* maps
 // (attendanceNonces, attendanceBatches). Unconstrained, that allowed two
@@ -136,10 +136,48 @@ attendanceRouter.post("/sessions/:id/remind", requireAuth, requireStaff, rateLim
   res.status(201).json({ reminder: record, message: !recipients.length ? "Everyone in this class has already checked in - no reminders sent." : delivered ? `Reminder emailed to ${delivered} student${delivered === 1 ? "" : "s"} who haven't checked in yet.` : "Reminder recorded; SMTP email was not available." });
 });
 attendanceRouter.get("/sessions/:id/reminders", requireAuth, requireStaff, async (req, res) => { const db = await readDb(); const session = (db.attendanceSessions || []).find((i) => i.id === req.params.id); if (!session || (req.user.role !== "admin" && session.createdBy !== req.user.id)) return res.status(404).json({ message: "Session not found." }); res.json({ reminders: (db.attendanceReminders || []).filter((i) => i.sessionId === session.id) }); });
-attendanceRouter.post("/check-in", requireAuth, async (req, res) => { if (req.user.role !== "student") return res.status(403).json({ message: "Only students can check in." }); const { sessionId, qrToken, latitude, longitude, accuracy, deviceFingerprint, nonce } = req.body || {}; if (!sessionId || typeof qrToken !== "string" || !isSafeKey(nonce)) return res.status(400).json({ message: "sessionId, qrToken, and an alphanumeric nonce (up to 128 chars) are required." });
-  if (deviceFingerprint !== undefined && (typeof deviceFingerprint !== "string" || deviceFingerprint.length > 256)) return res.status(400).json({ message: "deviceFingerprint is invalid." }); const db = await readDb(); db.attendanceNonces ||= {}; const session = (db.attendanceSessions || []).find((i) => i.id === sessionId); if (!session || !session.active || session.qrToken !== qrToken) return res.status(409).json({ message: "QR code expired or invalid." }); if (hasKey(db.attendanceNonces, nonce)) return res.status(409).json({ message: "This check-in has already been used." }); if (!timeInWindow(session)) return res.status(409).json({ message: "This attendance session is outside its time window." }); const subject = db.subjects.find((i) => i.id === session.subjectId); const student = db.students.find((i) => i.id === req.user.id); if (!student || student.className !== subject?.className) return res.status(403).json({ message: "You are not enrolled in this class." }); let location = null; let locationVerified = false; try { location = isWithinCollege(Number(latitude), Number(longitude), accuracy); locationVerified = location.withinRange; } catch { locationVerified = false; } if (!locationVerified) return res.status(403).json({ message: "Location verification failed. Please enable campus geolocation." }); const riskLevel = deviceFingerprint && db.deviceFingerprints?.[req.user.id] && db.deviceFingerprints[req.user.id] !== deviceFingerprint ? "high" : Number(accuracy) > 100 ? "medium" : "low"; db.deviceFingerprints ||= {}; db.deviceFingerprints[req.user.id] = deviceFingerprint || db.deviceFingerprints[req.user.id] || null; db.attendanceNonces[nonce] = { studentId: req.user.id, sessionId, usedAt: new Date().toISOString() }; const late = Date.now() > new Date(session.startsAt).getTime() + session.lateAfterMinutes * 60000; const result = upsertAttendance(db, { studentId: req.user.id, subjectId: session.subjectId, status: late ? "late" : "present", method: "qr-geofence", sessionId, locationVerified: true, riskLevel, deviceFingerprint }); if (riskLevel === "high") { db.attendanceReviewQueue ||= []; db.attendanceReviewQueue.unshift({ id: makeId("review"), attendanceId: result.record.id, reason: "device-risk", severity: "high", status: "open", createdAt: new Date().toISOString() }); } await writeDb(db); res.status(201).json({ record: enrichAttendance([result.record], db)[0], location: { distance: location.distance, radiusMeters: location.radiusMeters }, riskLevel }); });
+attendanceRouter.post("/check-in", requireAuth, async (req, res) => {
+  if (req.user.role !== "student") return res.status(403).json({ message: "Only students can check in." });
+  const { sessionId, qrToken, latitude, longitude, accuracy, deviceFingerprint, nonce } = req.body || {};
+  if (!sessionId || typeof qrToken !== "string" || !isSafeKey(nonce)) return res.status(400).json({ message: "sessionId, qrToken, and an alphanumeric nonce (up to 128 chars) are required." });
+  if (deviceFingerprint !== undefined && (typeof deviceFingerprint !== "string" || deviceFingerprint.length > 256)) return res.status(400).json({ message: "deviceFingerprint is invalid." });
+  const db = await readDb();
+  db.attendanceNonces ||= {};
+  const session = (db.attendanceSessions || []).find((i) => i.id === sessionId);
+  if (!session || !session.active || session.qrToken !== qrToken) return res.status(409).json({ message: "QR code expired or invalid." });
+  if (hasKey(db.attendanceNonces, nonce)) return res.status(409).json({ message: "This check-in has already been used." });
+  if (!timeInWindow(session)) return res.status(409).json({ message: "This attendance session is outside its time window." });
+  const subject = db.subjects.find((i) => i.id === session.subjectId);
+  const student = db.students.find((i) => i.id === req.user.id);
+  if (!student || student.className !== subject?.className) return res.status(403).json({ message: "You are not enrolled in this class." });
+  let location = null; let locationVerified = false;
+  try { location = isWithinCollege(Number(latitude), Number(longitude), accuracy); locationVerified = location.withinRange; } catch { locationVerified = false; }
+  if (!locationVerified) return res.status(403).json({ message: "Location verification failed. Please enable campus geolocation." });
 
-attendanceRouter.get("/dashboard", requireAuth, requireStaff, async (req, res) => { const db = await readDb(); const records = req.user.role === "teacher" ? (db.attendance || []).filter((i) => studentIdsVisibleToTeacher(db, req.user.code).has(i.studentId)) : (db.attendance || []); const analytics = attendanceAnalytics(db, records); const lowAttendance = db.students.filter((s) => { const stats = calculateStudentStats(s.id, records); return stats.total >= 3 && stats.percentage < 75; }).map((s) => { const { password, passwordHistory, passwordVersion, ...safeStudent } = s; return { ...safeStudent, stats: calculateStudentStats(s.id, records) }; }); const queue = (db.attendanceReviewQueue || []).filter((i) => i.status === "open"); res.json({ analytics, lowAttendance, reviewQueue: queue, totals: { records: records.length, sessions: (db.attendanceSessions || []).length, exceptions: queue.length } }); });
+  // Per-student signal: this account's fingerprint changed since last time
+  // (existing check). This alone can't catch one device being used to check
+  // in *several different* students' accounts - each of those accounts has
+  // no prior fingerprint stored, so the mismatch above never fires the first
+  // time it's used against a new account, which is exactly the "buddy
+  // punching" case this second, cross-student check exists to catch.
+  const ownDeviceChanged = Boolean(deviceFingerprint && db.deviceFingerprints?.[req.user.id] && db.deviceFingerprints[req.user.id] !== deviceFingerprint);
+  const sharedWithOtherStudent = Boolean(deviceFingerprint) && (db.attendance || []).some((i) => i.sessionId === sessionId && i.studentId !== req.user.id && i.deviceFingerprint === deviceFingerprint);
+  const riskLevel = ownDeviceChanged || sharedWithOtherStudent ? "high" : Number(accuracy) > 100 ? "medium" : "low";
+
+  db.deviceFingerprints ||= {};
+  db.deviceFingerprints[req.user.id] = deviceFingerprint || db.deviceFingerprints[req.user.id] || null;
+  db.attendanceNonces[nonce] = { studentId: req.user.id, sessionId, usedAt: new Date().toISOString() };
+  const late = Date.now() > new Date(session.startsAt).getTime() + session.lateAfterMinutes * 60000;
+  const result = upsertAttendance(db, { studentId: req.user.id, subjectId: session.subjectId, status: late ? "late" : "present", method: "qr-geofence", sessionId, locationVerified: true, riskLevel, deviceFingerprint });
+  if (riskLevel === "high") {
+    db.attendanceReviewQueue ||= [];
+    db.attendanceReviewQueue.unshift({ id: makeId("review"), attendanceId: result.record.id, reason: sharedWithOtherStudent ? "shared-device" : "device-risk", severity: "high", status: "open", createdAt: new Date().toISOString() });
+  }
+  await writeDb(db);
+  res.status(201).json({ record: enrichAttendance([result.record], db)[0], location: { distance: location.distance, radiusMeters: location.radiusMeters }, riskLevel });
+});
+
+attendanceRouter.get("/dashboard", requireAuth, requireStaff, async (req, res) => { const db = await readDb(); const visible = req.user.role === "teacher" ? studentIdsVisibleToTeacher(db, req.user.code) : null; const records = visible ? (db.attendance || []).filter((i) => visible.has(i.studentId)) : (db.attendance || []); const analytics = attendanceAnalytics(db, records); const lowAttendance = db.students.filter((s) => { const stats = calculateStudentStats(s.id, records); return stats.total >= 3 && stats.percentage < 75; }).map((s) => { const { password, passwordHistory, passwordVersion, ...safeStudent } = s; return { ...safeStudent, stats: calculateStudentStats(s.id, records) }; }); const attendanceById = new Map((db.attendance || []).map((item) => [item.id, item])); const queue = (db.attendanceReviewQueue || []).filter((i) => i.status === "open" && (!visible || visible.has(attendanceById.get(i.attendanceId)?.studentId))); res.json({ analytics, lowAttendance, reviewQueue: queue, totals: { records: records.length, sessions: (db.attendanceSessions || []).length, exceptions: queue.length } }); });
 // A teacher used to receive the whole review queue, including flagged
 // check-ins for students in other departments' classes. Scope it the same way
 // every other staff-facing attendance read is scoped.
@@ -191,6 +229,7 @@ attendanceRouter.patch("/corrections/:id", requireAuth, requireStaff, async (req
   const correction = (db.attendanceCorrections || []).find((i) => i.id === req.params.id);
   if (!correction) return res.status(404).json({ message: "Correction request not found." });
   if (correction.status !== "pending") return res.status(409).json({ message: "This correction request has already been resolved." });
+  if (req.user.role === "teacher" && correction.requestedBy === req.user.id) return res.status(403).json({ message: "A teacher cannot approve their own correction request." });
   const record = (db.attendance || []).find((i) => i.id === correction.attendanceId);
   if (!record) return res.status(404).json({ message: "The underlying attendance record no longer exists." });
   if (req.user.role === "teacher" && !studentIdsVisibleToTeacher(db, req.user.code).has(record.studentId)) return res.status(403).json({ message: "You can only review corrections for students in your classes." });

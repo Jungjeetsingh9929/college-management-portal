@@ -131,9 +131,12 @@ export function AdminDashboard() {
   }
 
   async function toggleStudent(student) {
-    await apiFetch(`/students/${student.id}/status`, { method: "PATCH", body: JSON.stringify({ active: student.active === false }) });
+    const nextActive = student.active === false;
+    const action = nextActive ? "reactivate" : "deactivate";
+    if (!window.confirm(`${action[0].toUpperCase()}${action.slice(1)} ${student.name}? ${nextActive ? "They will be able to sign in again." : "Their active sessions will be revoked."}`)) return;
+    await apiFetch(`/students/${student.id}/status`, { method: "PATCH", body: JSON.stringify({ active: nextActive }) });
     await loadData();
-    showToast?.(student.active === false ? "Student reactivated." : "Student deactivated.", "success");
+    showToast?.(nextActive ? "Student reactivated." : "Student deactivated.", "success");
   }
 
   if (loadError && !summary) return <ErrorState text={loadError} onRetry={loadData} />;
@@ -148,8 +151,8 @@ export function AdminDashboard() {
         <StatCard label="Subjects" value={summary.stats.subjects} hint="Active" tone="amber" />
         <StatCard label="Classrooms" value={adminOverview?.totals.classrooms ?? "—"} hint="Managed rooms" tone="blue" />
         <StatCard label="Today's classes" value={adminOverview?.totals.todaysClasses ?? "—"} hint="Scheduled today" tone="green" />
-        <StatCard label="Present marks" value={summary.stats.present} hint="All logs" tone="green" />
-        <StatCard label="Absent marks" value={summary.stats.absent} hint={`${summary.stats.percentage}% present`} tone="red" />
+        <StatCard label="Present attendance" value={summary.stats.present} hint="All attendance logs" tone="green" />
+        <StatCard label="Absent attendance" value={summary.stats.absent} hint={`${summary.stats.percentage}% present`} tone="red" />
       </section>
 
       {adminOverview && <section className="two-column"><div className="panel"><div className="section-heading"><div><span className="eyebrow">Operations</span><h2>Recent activity</h2></div><Badge value={`${adminOverview.recentActivity.length} recent`} /></div>{adminOverview.recentActivity.length ? <div className="list-stack">{adminOverview.recentActivity.map((item, index) => <div className="list-row" key={`${item.type}-${item.createdAt}-${index}`}><div><strong>{item.title}</strong><span>{item.type} · {new Date(item.createdAt).toLocaleString()}</span></div><Badge value="Logged" /></div>)}</div> : <p className="helper-text">No recent activity recorded.</p>}</div><div className="panel"><div className="section-heading"><div><span className="eyebrow">Security alerts</span><h2>Attention required</h2></div><Badge value="Monitor" /></div><div className="list-stack">{adminOverview.securityAlerts.map((alert) => <div className="list-row" key={alert.key}><div><strong>{alert.label}</strong><span>Review from the relevant management page.</span></div><Badge value={String(alert.count)} /></div>)}</div></div></section>}

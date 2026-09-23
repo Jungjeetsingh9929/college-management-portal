@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { CheckCircle2, ClipboardList, Paperclip } from "lucide-react";
 import { Badge, EmptyState } from "../components/UI.jsx";
 import { apiFetch, downloadToFile } from "../context/api.js";
-import { groupAssignmentsByStatus } from "../utils/assignments.js";
+import { formatAssignmentDueDate, groupAssignmentsByStatus } from "../utils/assignments.js";
 
 const GROUP_META = [
   { key: "overdue", label: "Overdue" },
@@ -18,9 +18,15 @@ function AssignmentRow({ assignment, onToggle, onUpload, busy }) {
   const [submissionLink, setSubmissionLink] = useState(assignment.submissionLink || "");
   const [files, setFiles] = useState([]);
 
+  // Auto-expand once a submission exists server-side (e.g. after a reload), but
+  // don't force-collapse otherwise — a student needs to be able to open this
+  // panel themselves to attach work *before* anything has been submitted. It
+  // used to be the other way around: the panel only rendered once
+  // assignment.completed was already true, and the checkbox was the only way
+  // to flip that, so opening the note/link/file fields meant checking the box
+  // first and silently POSTing an empty completion record.
   useEffect(() => {
     if (assignment.completed) setExpanded(true);
-    else setExpanded(false);
   }, [assignment.completed]);
 
   const handleSave = () => {
@@ -39,7 +45,9 @@ function AssignmentRow({ assignment, onToggle, onUpload, busy }) {
   const lockMessage = isGraded
     ? "This assignment has been graded — contact your teacher if you need to resubmit."
     : isFinalized
-      ? "Already submitted — contact your teacher if you need to resubmit."
+      ? canAddMoreFiles
+        ? "Your note and link are locked in once a file is attached, but you can still attach more files below."
+        : `You've attached the maximum of ${MAX_FILES} files — contact your teacher if you need to resubmit.`
       : "";
 
   return (
@@ -55,7 +63,7 @@ function AssignmentRow({ assignment, onToggle, onUpload, busy }) {
         </label>
         <div style={{ flex: 1 }}>
           <strong>{assignment.title}</strong>
-          <span>{assignment.className} · {assignment.teacherName} · Due: {new Date(assignment.dueDate).toLocaleString()}</span>
+          <span>{assignment.className} · {assignment.teacherName} · Due: {formatAssignmentDueDate(assignment.dueDate)}</span>
           {assignment.description && (
             <p style={{ margin: "6px 0 0", fontSize: "0.9rem", color: "var(--muted)" }}>{assignment.description}</p>
           )}
@@ -86,9 +94,19 @@ function AssignmentRow({ assignment, onToggle, onUpload, busy }) {
           )}
         </div>
         <Badge value={assignment.status} />
+        {!assignment.completed && (
+          <button
+            type="button"
+            className="link-button"
+            style={{ alignSelf: "flex-start" }}
+            onClick={() => setExpanded((value) => !value)}
+          >
+            {expanded ? "Close" : "Add submission"}
+          </button>
+        )}
       </div>
 
-      {expanded && assignment.completed && (
+      {expanded && (
         <div className="form-stack" style={{ marginLeft: "32px", padding: "12px", background: "var(--surface)", borderRadius: "6px", marginTop: "4px" }}>
           {lockMessage && <div className="helper-text" style={{ color: "var(--danger, #d64545)" }}>{lockMessage}</div>}
           <label style={{ fontSize: "0.85rem" }}>
@@ -139,7 +157,14 @@ function AssignmentRow({ assignment, onToggle, onUpload, busy }) {
               className="secondary-button"
               style={{ alignSelf: "flex-start" }}
               onClick={() => onUpload(assignment, files)}
-              disabled={busy || locked}
+              // File uploads are only refused server-side once the submission is
+              // graded (evaluatedAt) — a student can call the upload endpoint again
+              // later to add more files, up to MAX_FILES total. `locked` also turns
+              // true as soon as the first file is uploaded (it governs the text/link
+              // fields, which the server *does* freeze once any file exists), so
+              // gating this button on `locked` made it impossible to ever add a
+              // second batch of files even though the input stayed visible.
+              disabled={busy || isGraded}
             >
               Upload {files.length} file{files.length > 1 ? "s" : ""}
             </button>

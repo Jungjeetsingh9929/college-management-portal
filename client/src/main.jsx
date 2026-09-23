@@ -1,49 +1,50 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { AppLayout } from "./components/AppLayout.jsx";
-import { AdminDashboard } from "./pages/AdminDashboard.jsx";
-import { AttendanceHistory } from "./pages/AttendanceHistory.jsx";
-import { Complaints } from "./pages/Complaints.jsx";
-import { Home } from "./pages/Home.jsx";
-import { Login } from "./pages/Login.jsx";
-import { Reports } from "./pages/Reports.jsx";
-import { Schedule } from "./pages/Schedule.jsx";
-import { CentralTimetable } from "./pages/CentralTimetable.jsx";
-import { StudentAssignments } from "./pages/StudentAssignments.jsx";
-import { StudentDashboard } from "./pages/StudentDashboard.jsx";
-import { StudentProfile } from "./pages/StudentProfile.jsx";
-import { StudentRecords } from "./pages/StudentRecords.jsx";
-import { AccountSettings } from "./pages/AccountSettings.jsx";
-import { SubjectManagement } from "./pages/SubjectManagement.jsx";
-import { AdminResources } from "./pages/AdminResources.jsx";
-import { SecurityDashboard } from "./pages/SecurityDashboard.jsx";
-import { Teachers } from "./pages/Teachers.jsx";
-import { FacultyDashboard } from "./pages/FacultyDashboard.jsx";
-import { FacultyAssignments } from "./pages/FacultyAssignments.jsx";
-import { FacultyTools } from "./pages/FacultyTools.jsx";
-import { MarkAttendance } from "./pages/MarkAttendance.jsx";
-import { AttendanceCommandCenter } from "./pages/AttendanceCommandCenter.jsx";
-import { QuizGenerator } from "./pages/QuizGenerator.jsx";
-import { QuizAnswer } from "./pages/QuizAnswer.jsx";
-import { QuizSession } from "./pages/QuizSession.jsx";
-import { AttendCheckIn } from "./pages/AttendCheckIn.jsx";
-import { YearSchedule } from "./pages/YearSchedule.jsx";
-import { HODCenter } from "./pages/HODCenter.jsx";
-import { DepartmentDetail } from "./pages/DepartmentDetail.jsx";
-import { FeesCenter } from "./pages/FeesCenter.jsx";
-import { MyFees } from "./pages/MyFees.jsx";
-import { EventsCalendar } from "./pages/EventsCalendar.jsx";
-import { DigitalLibrary } from "./pages/DigitalLibrary.jsx";
-import { PhotoApprovals } from "./pages/PhotoApprovals.jsx";
-import { MarksCenter } from "./pages/MarksCenter.jsx";
-import { MarksSheet } from "./pages/MarksSheet.jsx";
-import { MyResults } from "./pages/MyResults.jsx";
+const page = (loader, name) => lazy(() => loader().then((module) => ({ default: module[name] })));
+const AdminDashboard = page(() => import("./pages/AdminDashboard.jsx"), "AdminDashboard");
+const AttendanceHistory = page(() => import("./pages/AttendanceHistory.jsx"), "AttendanceHistory");
+const Complaints = page(() => import("./pages/Complaints.jsx"), "Complaints");
+const Home = page(() => import("./pages/Home.jsx"), "Home");
+const Login = page(() => import("./pages/Login.jsx"), "Login");
+const Reports = page(() => import("./pages/Reports.jsx"), "Reports");
+const Schedule = page(() => import("./pages/Schedule.jsx"), "Schedule");
+const CentralTimetable = page(() => import("./pages/CentralTimetable.jsx"), "CentralTimetable");
+const StudentAssignments = page(() => import("./pages/StudentAssignments.jsx"), "StudentAssignments");
+const StudentDashboard = page(() => import("./pages/StudentDashboard.jsx"), "StudentDashboard");
+const StudentProfile = page(() => import("./pages/StudentProfile.jsx"), "StudentProfile");
+const StudentRecords = page(() => import("./pages/StudentRecords.jsx"), "StudentRecords");
+const AccountSettings = page(() => import("./pages/AccountSettings.jsx"), "AccountSettings");
+const SubjectManagement = page(() => import("./pages/SubjectManagement.jsx"), "SubjectManagement");
+const AdminResources = page(() => import("./pages/AdminResources.jsx"), "AdminResources");
+const SecurityDashboard = page(() => import("./pages/SecurityDashboard.jsx"), "SecurityDashboard");
+const Teachers = page(() => import("./pages/Teachers.jsx"), "Teachers");
+const FacultyDashboard = page(() => import("./pages/FacultyDashboard.jsx"), "FacultyDashboard");
+const FacultyAssignments = page(() => import("./pages/FacultyAssignments.jsx"), "FacultyAssignments");
+const FacultyTools = page(() => import("./pages/FacultyTools.jsx"), "FacultyTools");
+const MarkAttendance = page(() => import("./pages/MarkAttendance.jsx"), "MarkAttendance");
+const AttendanceCommandCenter = page(() => import("./pages/AttendanceCommandCenter.jsx"), "AttendanceCommandCenter");
+const QuizGenerator = page(() => import("./pages/QuizGenerator.jsx"), "QuizGenerator");
+const QuizAnswer = page(() => import("./pages/QuizAnswer.jsx"), "QuizAnswer");
+const QuizSession = page(() => import("./pages/QuizSession.jsx"), "QuizSession");
+const AttendCheckIn = page(() => import("./pages/AttendCheckIn.jsx"), "AttendCheckIn");
+const YearSchedule = page(() => import("./pages/YearSchedule.jsx"), "YearSchedule");
+const HODCenter = page(() => import("./pages/HODCenter.jsx"), "HODCenter");
+const DepartmentDetail = page(() => import("./pages/DepartmentDetail.jsx"), "DepartmentDetail");
+const FeesCenter = page(() => import("./pages/FeesCenter.jsx"), "FeesCenter");
+const MyFees = page(() => import("./pages/MyFees.jsx"), "MyFees");
+const EventsCalendar = page(() => import("./pages/EventsCalendar.jsx"), "EventsCalendar");
+const DigitalLibrary = page(() => import("./pages/DigitalLibrary.jsx"), "DigitalLibrary");
+const PhotoApprovals = page(() => import("./pages/PhotoApprovals.jsx"), "PhotoApprovals");
+const MarksCenter = page(() => import("./pages/MarksCenter.jsx"), "MarksCenter");
+const MarksSheet = page(() => import("./pages/MarksSheet.jsx"), "MarksSheet");
+const MyResults = page(() => import("./pages/MyResults.jsx"), "MyResults");
 import { ToastProvider } from "./components/UI.jsx";
 import "./styles.css";
 
-function ProtectedRoute({ children, role, roles }) {
+function ProtectedRoute({ children, role, roles, hodOnly = false }) {
   const { user, loading } = useAuth();
   const location = useLocation();
   if (loading) return <div className="screen-loader">Loading...</div>;
@@ -55,12 +56,14 @@ function ProtectedRoute({ children, role, roles }) {
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to={user.role === "admin" ? "/admin" : user.role === "teacher" ? "/faculty" : "/student"} replace />;
   }
+  if (hodOnly && user.role === "teacher" && !user.isHod) return <Navigate to="/faculty" replace />;
   return children;
 }
 
 function AppRoutes() {
   return (
-    <Routes>
+    <Suspense fallback={<div className="screen-loader">Loading page...</div>}>
+      <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route
@@ -237,7 +240,7 @@ function AppRoutes() {
       <Route
         path="/teachers"
         element={
-          <ProtectedRoute roles={["teacher", "admin"]}>
+          <ProtectedRoute roles={["student", "teacher", "admin"]}>
             <AppLayout>
               <Teachers />
             </AppLayout>
@@ -267,8 +270,8 @@ function AppRoutes() {
       <Route path="/marks" element={<ProtectedRoute roles={["teacher", "admin"]}><AppLayout><MarksCenter /></AppLayout></ProtectedRoute>} />
       <Route path="/marks/:subjectId" element={<ProtectedRoute roles={["teacher", "admin"]}><AppLayout><MarksSheet /></AppLayout></ProtectedRoute>} />
       <Route path="/my-results" element={<ProtectedRoute role="student"><AppLayout><MyResults /></AppLayout></ProtectedRoute>} />
-      <Route path="/hod" element={<ProtectedRoute role="teacher"><AppLayout><HODCenter /></AppLayout></ProtectedRoute>} />
-      <Route path="/fees" element={<ProtectedRoute roles={["admin", "teacher"]}><AppLayout><FeesCenter /></AppLayout></ProtectedRoute>} />
+      <Route path="/hod" element={<ProtectedRoute role="teacher" hodOnly><AppLayout><HODCenter /></AppLayout></ProtectedRoute>} />
+      <Route path="/fees" element={<ProtectedRoute roles={["admin", "teacher"]} hodOnly><AppLayout><FeesCenter /></AppLayout></ProtectedRoute>} />
       <Route
         path="/mark-attendance"
         element={
@@ -333,7 +336,8 @@ function AppRoutes() {
         }
       />
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 }
 

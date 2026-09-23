@@ -11,6 +11,11 @@ services:
         value: production
       - key: HOST
         value: 0.0.0.0
+      # Render places one trusted reverse proxy in front of the service.
+      # Keep this explicit so the rate limiter/audit IP behavior is not left
+      # to an environment-dependent default.
+      - key: TRUST_PROXY
+        value: 1
       - key: JWT_SECRET
         generateValue: true
       - key: DATABASE_URL
@@ -29,6 +34,10 @@ services:
         sync: false
       - key: SEED_FACULTY_PASSWORD
         sync: false
+      - key: ALLOW_DEMO_LOGIN
+        value: "false"
+      - key: RUN_E2E_SEED
+        value: "false"
       - key: LOW_ATTENDANCE_THRESHOLD
         value: 75
       # Online fee payments (optional, Razorpay sandbox). Leave unset to run
@@ -39,6 +48,8 @@ services:
         sync: false
       - key: RAZORPAY_WEBHOOK_SECRET
         sync: false
+      - key: RAZORPAY_ALLOW_LIVE
+        value: "false"
       # Geofenced attendance (optional): leave unset to disable the
       # "Mark my attendance" self check-in feature entirely.
       - key: COLLEGE_LATITUDE

@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { apiFetch } from "./api.js";
+import { apiFetch, setOnUserRefreshed } from "./api.js";
 
 const AuthContext = createContext(null);
 
@@ -20,10 +20,31 @@ export function AuthProvider({ children }) {
     // logged people out just because /auth/me had a bad moment, so this only
     // updates loading state and leaves user signed out for this load without
     // touching storage.
-    apiFetch("/auth/me")
+    apiFetch("/auth/me", { _silent: true })
       .then((data) => setUser(data.user))
       .catch(() => {})
       .finally(() => setLoading(false));
+  }, []);
+
+  // POST /auth/refresh now returns the same `user` shape /auth/login and
+  // /auth/me do, computed fresh from the database. Wiring it in here means
+  // role metadata (e.g. a teacher's isHod, set/unset by an admin) catches up
+  // on the next silent background token refresh (every ~15 minutes) instead
+  // of staying frozen at whatever it was at last login/page-load for the
+  // rest of a session that, by design, can stay open indefinitely.
+  useEffect(() => {
+    setOnUserRefreshed((freshUser) => setUser(freshUser));
+    function onSessionExpired() {
+      localStorage.removeItem("attendance_token");
+      localStorage.removeItem("attendance_refresh_token");
+      setUser(null);
+      window.dispatchEvent(new CustomEvent("portal:toast", { detail: { message: "Your session expired. Please sign in again.", tone: "error" } }));
+    }
+    window.addEventListener("portal:session-expired", onSessionExpired);
+    return () => {
+      setOnUserRefreshed(null);
+      window.removeEventListener("portal:session-expired", onSessionExpired);
+    };
   }, []);
 
   async function login(credentials) {

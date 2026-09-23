@@ -61,6 +61,20 @@ function makeOtp() { return String(crypto.randomInt(100000, 1000000)); }
 function otpDigest(value) { return digestToken(`otp:${value}`); }
 function allAccounts(db) { return [...(db.admins || []), ...(db.students || []), ...(db.teachers || [])]; }
 function accountForEmail(db, email) { return allAccounts(db).find((item) => String(item.email || "").toLowerCase() === String(email).trim().toLowerCase()); }
+// Shared by /login, /refresh, and /me so all three ever compute the same
+// "safe user" shape, straight from the database, the same way. isHod in
+// particular has to be looked up fresh every time (never trusted from a
+// stale caller-supplied value) - it's what lets a promotion/demotion an
+// admin makes show up on the next refresh instead of only after the next
+// full login.
+function buildSafeUser(db, account, role) {
+  if (role === "student") return { ...publicStudent(account, db.attendance), role, approvedPhotoId: approvedPhotoId(db, account.id) };
+  if (role === "teacher") {
+    const hodDepartment = (db.departments || []).find((item) => item.hodId === account.id);
+    return { id: account.id, name: account.name, email: account.email, code: account.code, department: account.department, role, isHod: Boolean(hodDepartment), hodDepartmentId: hodDepartment?.id || null, hodDepartment: hodDepartment?.name || null };
+  }
+  return { id: account.id, name: account.name, email: account.email, role };
+}
 
 authRouter.post("/login", rateLimit({
   ...loginIpConfig,
@@ -110,13 +124,7 @@ authRouter.post("/login", rateLimit({
 
   const session = await createRefreshToken({ ...user, role: userRole }, db, { device: req.headers["user-agent"], ip: req.ip, userAgent: req.get("user-agent") });
   const token = signToken({ ...user, role: userRole, sessionId: session.sessionId });
-  const hodDepartment = userRole === "teacher" ? (db.departments || []).find((item) => item.hodId === user.id) : null;
-  const safeUser =
-    userRole === "student"
-      ? { ...publicStudent(user, db.attendance), role: userRole, approvedPhotoId: approvedPhotoId(db, user.id) }
-      : userRole === "teacher"
-      ? { id: user.id, name: user.name, email: user.email, code: user.code, department: user.department, role: userRole, isHod: Boolean(hodDepartment), hodDepartmentId: hodDepartment?.id || null, hodDepartment: hodDepartment?.name || null }
-      : { id: user.id, name: user.name, email: user.email, role: userRole };
+  const safeUser = buildSafeUser(db, user, userRole);
 
   await recordAudit({ userId: user.id, role: userRole, action: "auth.login.success", severity: "info", ip: req.ip, userAgent: req.get("user-agent"), target: user.id });
   // Tells the client this account signed in with a password that no longer
@@ -136,7 +144,12 @@ authRouter.post("/refresh", rateLimit({ ...refreshConfig, keyGenerator: clientKe
   // ago (the access token refreshes every 15 minutes).
   const rotated = Object.values(db.refreshTokens).find((item) => item.sessionId === session.sessionId);
   if (rotated) { rotated.createdAt = stored.createdAt || rotated.createdAt; rotated.lastActiveAt = new Date().toISOString(); await writeDb(db); }
-  const token = signToken({ ...user, sessionId: session.sessionId }); res.json({ token, refreshToken: session.token, sessionId: session.sessionId, expiresIn: process.env.ACCESS_TOKEN_TTL || "15m" });
+  const token = signToken({ ...user, sessionId: session.sessionId });
+  // Also returning `user` here (same shape as /login) is what lets the
+  // client refresh role metadata like isHod on every silent background
+  // token refresh, instead of only on a full page load - see AuthContext.jsx.
+  const safeUser = buildSafeUser(db, account, stored.role);
+  res.json({ token, refreshToken: session.token, sessionId: session.sessionId, expiresIn: process.env.ACCESS_TOKEN_TTL || "15m", user: safeUser });
 });
 
 authRouter.post("/logout", async (req, res) => { try { validateKeys(req.body || {}, ["refreshToken"]); } catch { return res.status(400).json({ message: "Invalid logout request." }); } if (typeof req.body?.refreshToken === "string" && req.body.refreshToken.length <= 500) { const db = await readDb(); await revokeRefreshToken(req.body.refreshToken, db); } res.json({ ok: true }); });
@@ -326,16 +339,16 @@ authRouter.get("/me", requireAuth, async (req, res) => {
   if (req.user.role === "admin") {
     const admin = db.admins.find((item) => item.id === req.user.id);
     if (!admin) return res.status(404).json({ message: "User not found." });
-    return res.json({ user: { id: admin.id, name: admin.name, email: admin.email, role: "admin" } });
+    return res.json({ user: buildSafeUser(db, admin, "admin") });
   }
-  
+
   if (req.user.role === "teacher") {
     const teacher = (db.teachers || []).find((item) => item.id === req.user.id);
     if (!teacher) return res.status(404).json({ message: "User not found." });
-    return res.json({ user: { id: teacher.id, name: teacher.name, email: teacher.email, code: teacher.code, department: teacher.department, role: "teacher", isHod: req.user.isHod, hodDepartmentId: req.user.hodDepartmentId, hodDepartment: req.user.hodDepartment } });
+    return res.json({ user: buildSafeUser(db, teacher, "teacher") });
   }
 
   const student = db.students.find((item) => item.id === req.user.id);
   if (!student) return res.status(404).json({ message: "User not found." });
-  res.json({ user: { ...publicStudent(student, db.attendance), role: "student", approvedPhotoId: approvedPhotoId(db, student.id) } });
+  res.json({ user: buildSafeUser(db, student, "student") });
 });

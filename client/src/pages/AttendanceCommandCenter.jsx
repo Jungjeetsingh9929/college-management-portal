@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 import { Activity, AlertTriangle, Clock3, Copy, Download, ExternalLink, Mail, MessageCircle, QrCode, RefreshCw, ShieldAlert, Users } from "lucide-react";
-import { apiDownload, apiFetch } from "../context/api.js";
+import { apiFetch, downloadToFile } from "../context/api.js";
 import { Badge, EmptyState, SearchableSelect, StatCard } from "../components/UI.jsx";
 
 function formatDate(value) {
@@ -164,13 +164,11 @@ export function AttendanceCommandCenter() {
     finally { setCorrectionActionId(""); }
   }
   async function download() {
-    const blob = await apiDownload("/attendance/export.csv");
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "attendance-report.csv";
-    anchor.click();
-    URL.revokeObjectURL(url);
+    // Use the shared downloadToFile helper (context/api.js) instead of a hand-rolled
+    // anchor: it appends the temporary <a> to the DOM before .click() (required for
+    // Firefox to fire the synthetic click) and defers revokeObjectURL out of the same
+    // tick (so the download can't be cancelled before the browser reads the blob).
+    await downloadToFile("/attendance/export.csv", "attendance-report.csv");
   }
 
   const liveSessions = useMemo(() => sessions.filter((session) => sessionState(session) === "live"), [sessions]);

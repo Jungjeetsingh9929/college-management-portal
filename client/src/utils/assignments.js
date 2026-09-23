@@ -25,3 +25,27 @@ export function groupAssignmentsByStatus(assignments) {
   }
   return groups;
 }
+
+// Due dates are calendar dates, not instants. Treat an assignment as overdue
+// only after the local calendar day has ended so dashboard and list status
+// remain consistent throughout the due date.
+export function isAssignmentOverdue(assignment, now = new Date()) {
+  const dueDate = String(assignment?.dueDate || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return false;
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  return dueDate < today;
+}
+
+export function formatAssignmentDueDate(value) {
+  const dueDate = String(value || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return String(value || "—");
+  return new Date(`${dueDate}T00:00:00`).toLocaleDateString();
+}
+
+export function isSubmissionLate(completedAt, dueDate) {
+  const submitted = new Date(completedAt);
+  const due = String(dueDate || "").slice(0, 10);
+  if (!Number.isFinite(submitted.getTime()) || !/^\d{4}-\d{2}-\d{2}$/.test(due)) return false;
+  const submittedDay = `${submitted.getFullYear()}-${String(submitted.getMonth() + 1).padStart(2, "0")}-${String(submitted.getDate()).padStart(2, "0")}`;
+  return submittedDay > due;
+}

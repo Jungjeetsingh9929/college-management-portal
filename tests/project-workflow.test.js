@@ -30,7 +30,8 @@ async function call(path, options = {}) {
     headers: { ...(isForm ? {} : { "Content-Type": "application/json" }), ...(options.headers || {}) }
   });
   const raw = await response.text();
-  const data = raw ? JSON.parse(raw) : {};
+  const contentType = response.headers.get("content-type") || "";
+  const data = contentType.includes("application/json") && raw ? JSON.parse(raw) : {};
   return { response, data };
 }
 
