@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Activity, Award, BarChart3, Bell, BookOpen, Camera, Building2, CalendarClock, CalendarDays, ClipboardCheck, ClipboardList, CreditCard, GraduationCap, History, KeyRound, LayoutDashboard, LogOut, Menu, ShieldCheck, UserRound, UsersRound, Calendar, FileText, QrCode, X } from "lucide-react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { GlobalSearch } from "./GlobalSearch.jsx";
 import { NotificationCenter } from "./NotificationCenter.jsx";
@@ -27,6 +27,15 @@ export function AppLayout({ children }) {
   const navigate = useNavigate();
   const { showToast } = useToast() || {};
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+  // Mobile drawer: close on route change and on Escape.
+  useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
+  useEffect(() => {
+    if (!sidebarOpen) return undefined;
+    const onKey = (event) => { if (event.key === "Escape") setSidebarOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sidebarOpen]);
   const linksByRole = {
     admin: [
       { to: "/admin", label: "Dashboard", icon: LayoutDashboard }, { to: "/subjects", label: "Subjects", icon: BookOpen }, { to: "/marks", label: "Marks & Results", icon: Award },

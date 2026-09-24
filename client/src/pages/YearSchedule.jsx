@@ -55,7 +55,7 @@ export function YearSchedule() {
         <p>List of holidays and important dates for the academic year.</p>
 
         {holidays.length > 0 ? (
-          <div className="table-responsive" style={{ marginTop: '20px' }}>
+          <div className="table-wrap table-responsive" style={{ marginTop: '20px' }}>
             <table>
               <thead>
                 <tr>
