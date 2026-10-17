@@ -1,0 +1,17 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Runtime state and generated uploads
+server/db/database.json
+storage/
+
+# Build and dependency output
+node_modules/
+dist/
+
+# Local logs and temporary files
+*.log
+.DS_Store
+*.zip
